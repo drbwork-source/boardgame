@@ -123,8 +123,29 @@ def board_to_string(board: Board) -> str:
 def parse_weights(text: str) -> Dict[CellType, float]:
     weights: Dict[CellType, float] = {}
     for part in text.split(","):
-        symbol, raw_weight = part.split(":", maxsplit=1)
-        weights[symbol.strip()] = float(raw_weight)
+        item = part.strip()
+        if not item:
+            continue
+        if ":" not in item:
+            raise ValueError(f"Invalid weight entry '{item}'. Expected format symbol:value")
+
+        symbol, raw_weight = item.split(":", maxsplit=1)
+        symbol = symbol.strip()
+        if not symbol:
+            raise ValueError("Weight symbol cannot be empty")
+
+        try:
+            weight = float(raw_weight)
+        except ValueError as exc:
+            raise ValueError(f"Invalid numeric weight for '{symbol}': {raw_weight}") from exc
+        if weight < 0:
+            raise ValueError(f"Weight for '{symbol}' cannot be negative")
+
+        weights[symbol] = weight
+
+    if not weights:
+        raise ValueError("At least one terrain weight is required")
+
     return weights
 
 
@@ -259,3 +280,7 @@ def main() -> None:
         run_cli(args)
     else:
         run_gui()
+
+
+if __name__ == "__main__":
+    main()
