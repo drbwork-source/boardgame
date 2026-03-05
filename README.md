@@ -16,6 +16,8 @@ You can:
 - apply symmetry, smoothing, and clustering
 - generate new boards repeatedly
 - save the generated board to a text file
+- edit tiles directly in an editor mode (paint specific symbols where you want them)
+- export the board preview to PNG or JPEG image files
 
 This fixes the "console opens then closes" problem for desktop usage.
 

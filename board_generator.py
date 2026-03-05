@@ -13,6 +13,14 @@ import random
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Dict, List, Sequence, Tuple
+import importlib.util
+
+if importlib.util.find_spec("PIL") is not None:
+    from PIL import Image, ImageDraw, ImageFont
+else:  # Optional dependency for image export.
+    Image = None
+    ImageDraw = None
+    ImageFont = None
 
 
 CellType = str
@@ -26,15 +34,15 @@ TILESET_PRESETS: Dict[str, Dict[CellType, float]] = {
 }
 
 TILE_COLORS: Dict[CellType, str] = {
-    ".": "#9BC53D",  # plains
-    "F": "#2E7D32",  # forest
-    "M": "#8D99AE",  # mountain
-    "W": "#219EBC",  # water
-    "B": "#E9C46A",  # beach
-    "D": "#E29578",  # desert
-    "O": "#F4A261",  # oasis
-    "V": "#9D0208",  # volcanic ground
-    "A": "#6D6875",  # ashlands
+    ".": "#A7D676",  # plains
+    "F": "#4F9D69",  # forest
+    "M": "#A0AEC0",  # mountain
+    "W": "#4EA8DE",  # water
+    "B": "#F4D58D",  # beach
+    "D": "#F4A261",  # desert
+    "O": "#E9C46A",  # oasis
+    "V": "#AE2012",  # volcanic ground
+    "A": "#7D8597",  # ashlands
 }
 
 TILE_STYLES: Dict[CellType, Dict[str, str]] = {
@@ -208,6 +216,8 @@ class BoardGeneratorApp:
         self.board_text = ""
         self.current_board: Board = []
         self.tile_size = 20
+        self.edit_mode_var = tk.BooleanVar(value=False)
+        self.paint_tile_var = tk.StringVar(value=".")
 
         header = tk.Frame(root, bg="#0B132B")
         header.pack(fill="x", padx=14, pady=(12, 2))
@@ -288,6 +298,26 @@ class BoardGeneratorApp:
         self._styled_button(controls, "Save Board...", self.save_board).grid(
             row=2, column=6, columnspan=2, sticky="ew", padx=4, pady=2
         )
+        self._styled_button(controls, "Export Image...", self.export_image).grid(
+            row=3, column=6, columnspan=2, sticky="ew", padx=4, pady=(2, 6)
+        )
+
+        tk.Checkbutton(
+            controls,
+            text="Editor Mode",
+            variable=self.edit_mode_var,
+            bg="#1C2541",
+            fg="#F8F9FA",
+            activebackground="#1C2541",
+            activeforeground="#F8F9FA",
+            selectcolor="#0F172A",
+            highlightthickness=0,
+        ).grid(row=1, column=0, columnspan=2, padx=4, pady=(6, 2), sticky="w")
+        tk.Label(controls, text="Paint Tile", bg="#1C2541", fg="#F8F9FA").grid(
+            row=1, column=2, padx=4, pady=(6, 2), sticky="e"
+        )
+        self.paint_tile_menu = tk.OptionMenu(controls, self.paint_tile_var, *sorted(TILE_COLORS.keys()))
+        self.paint_tile_menu.grid(row=1, column=3, padx=4, pady=(6, 2), sticky="w")
 
         legend = tk.LabelFrame(
             root,
@@ -359,6 +389,9 @@ class BoardGeneratorApp:
         canvas_shell.grid_columnconfigure(0, weight=1)
         canvas_shell.grid_rowconfigure(0, weight=1)
 
+        self.board_canvas.bind("<Button-1>", self._paint_tile)
+        self.board_canvas.bind("<B1-Motion>", self._paint_tile)
+
         self.refresh_legend()
         self.generate()
 
@@ -385,6 +418,7 @@ class BoardGeneratorApp:
     def apply_tileset(self) -> None:
         chosen = TILESET_PRESETS[self.tileset_var.get()]
         self.weights_var.set(",".join(f"{symbol}:{weight:.2f}" for symbol, weight in chosen.items()))
+        self._refresh_editor_tile_options()
         self.refresh_legend()
 
     def add_custom_tile(self) -> None:
@@ -408,7 +442,16 @@ class BoardGeneratorApp:
             TILE_COLORS[symbol] = "#E2E8F0"
             TILE_NAMES[symbol] = f"Tile '{symbol}'"
             TILE_STYLES[symbol] = {"fg": "#111827", "bg": "#F8FAFC", "glyph": symbol}
+        self._refresh_editor_tile_options()
         self.refresh_legend()
+
+    def _refresh_editor_tile_options(self) -> None:
+        menu = self.paint_tile_menu["menu"]
+        menu.delete(0, "end")
+        for symbol in sorted(TILE_COLORS.keys()):
+            menu.add_command(label=symbol, command=lambda value=symbol: self.paint_tile_var.set(value))
+        if self.paint_tile_var.get() not in TILE_COLORS:
+            self.paint_tile_var.set(sorted(TILE_COLORS.keys())[0])
 
     def refresh_legend(self) -> None:
         for child in self.legend_frame.winfo_children():
@@ -456,6 +499,7 @@ class BoardGeneratorApp:
             board = generate_board(options)
             self.current_board = board
             self.board_text = board_to_string(board)
+            self._refresh_editor_tile_options()
             self._draw_board(board)
             self.refresh_legend()
         except Exception as exc:
@@ -504,6 +548,23 @@ class BoardGeneratorApp:
         height = len(board) * tile
         self.board_canvas.configure(scrollregion=(0, 0, width, height))
 
+    def _paint_tile(self, event: tk.Event) -> None:
+        if not self.edit_mode_var.get() or not self.current_board:
+            return
+
+        tile = self.tile_size
+        x = int(self.board_canvas.canvasx(event.x) // tile)
+        y = int(self.board_canvas.canvasy(event.y) // tile)
+        if not (0 <= y < len(self.current_board) and 0 <= x < len(self.current_board[0])):
+            return
+
+        selected = self.paint_tile_var.get()
+        if not selected:
+            return
+        self.current_board[y][x] = selected
+        self.board_text = board_to_string(self.current_board)
+        self._draw_board(self.current_board)
+
     def save_board(self) -> None:
         if not self.board_text.strip():
             messagebox.showwarning("Nothing to save", "Generate a board first.")
@@ -520,6 +581,53 @@ class BoardGeneratorApp:
 
         Path(path).write_text(self.board_text, encoding="utf-8")
         messagebox.showinfo("Saved", f"Board saved to:\n{path}")
+
+    def export_image(self) -> None:
+        if not self.current_board:
+            messagebox.showwarning("Nothing to export", "Generate a board first.")
+            return
+        if Image is None or ImageDraw is None:
+            messagebox.showerror(
+                "Pillow required",
+                "Image export requires Pillow. Install it with: pip install pillow",
+            )
+            return
+
+        path = filedialog.asksaveasfilename(
+            title="Export board image",
+            defaultextension=".png",
+            filetypes=[("PNG image", "*.png"), ("JPEG image", "*.jpg;*.jpeg")],
+            initialfile="generated_board.png",
+        )
+        if not path:
+            return
+
+        tile = self.tile_size
+        width = len(self.current_board[0]) * tile
+        height = len(self.current_board) * tile
+        image = Image.new("RGB", (width, height), "#0B1020")
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.load_default() if ImageFont is not None else None
+
+        for y, row in enumerate(self.current_board):
+            for x, symbol in enumerate(row):
+                style = TILE_STYLES.get(symbol, {"fg": "#111827", "glyph": symbol})
+                color = TILE_COLORS.get(symbol, "#F8FAFC")
+                x0, y0 = x * tile, y * tile
+                x1, y1 = x0 + tile, y0 + tile
+                draw.rectangle([x0, y0, x1, y1], fill=color, outline="#0F172A", width=1)
+
+                glyph = style.get("glyph", symbol)
+                if font is not None:
+                    bbox = draw.textbbox((0, 0), glyph, font=font)
+                    text_w = bbox[2] - bbox[0]
+                    text_h = bbox[3] - bbox[1]
+                    tx = x0 + (tile - text_w) / 2
+                    ty = y0 + (tile - text_h) / 2
+                    draw.text((tx, ty), glyph, fill=style["fg"], font=font)
+
+        image.save(path)
+        messagebox.showinfo("Export complete", f"Board image exported to:\n{path}")
 
 
 def run_gui() -> None:
