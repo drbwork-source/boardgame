@@ -18,6 +18,37 @@ from typing import Dict, List, Sequence, Tuple
 CellType = str
 Board = List[List[CellType]]
 
+TILESET_PRESETS: Dict[str, Dict[CellType, float]] = {
+    "Classic": {".": 0.65, "F": 0.17, "M": 0.10, "W": 0.08},
+    "Archipelago": {"W": 0.45, ".": 0.30, "B": 0.15, "F": 0.10},
+    "Desert Frontier": {"D": 0.45, ".": 0.25, "M": 0.15, "O": 0.15},
+    "Volcanic": {"V": 0.35, "A": 0.25, "M": 0.20, "W": 0.20},
+}
+
+TILE_COLORS: Dict[CellType, str] = {
+    ".": "#9BC53D",  # plains
+    "F": "#2E7D32",  # forest
+    "M": "#8D99AE",  # mountain
+    "W": "#219EBC",  # water
+    "B": "#E9C46A",  # beach
+    "D": "#E29578",  # desert
+    "O": "#F4A261",  # oasis
+    "V": "#9D0208",  # volcanic ground
+    "A": "#6D6875",  # ashlands
+}
+
+TILE_NAMES: Dict[CellType, str] = {
+    ".": "Plains",
+    "F": "Forest",
+    "M": "Mountain",
+    "W": "Water",
+    "B": "Beach",
+    "D": "Desert",
+    "O": "Oasis",
+    "V": "Volcanic",
+    "A": "Ashlands",
+}
+
 
 @dataclass
 class BoardOptions:
@@ -153,10 +184,36 @@ class BoardGeneratorApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Board Generator (50x50)")
+        self.root.configure(bg="#0B132B")
         self.board_text = ""
 
-        controls = tk.Frame(root)
-        controls.pack(fill="x", padx=10, pady=8)
+        header = tk.Frame(root, bg="#0B132B")
+        header.pack(fill="x", padx=14, pady=(12, 2))
+        tk.Label(
+            header,
+            text="Board Generator Studio",
+            font=("Helvetica", 16, "bold"),
+            bg="#0B132B",
+            fg="#FAF9F6",
+        ).pack(anchor="w")
+        tk.Label(
+            header,
+            text="Build colorful procedural maps with tile presets, custom terrain symbols, and export support.",
+            font=("Helvetica", 10),
+            bg="#0B132B",
+            fg="#C8D3F5",
+        ).pack(anchor="w", pady=(2, 6))
+
+        controls = tk.LabelFrame(
+            root,
+            text="Generation Controls",
+            bg="#1C2541",
+            fg="#F8F9FA",
+            padx=8,
+            pady=6,
+            font=("Helvetica", 10, "bold"),
+        )
+        controls.pack(fill="x", padx=12, pady=8)
 
         self.width_var = tk.StringVar(value="50")
         self.height_var = tk.StringVar(value="50")
@@ -165,34 +222,153 @@ class BoardGeneratorApp:
         self.symmetry_var = tk.StringVar(value="none")
         self.smoothing_var = tk.StringVar(value="1")
         self.cluster_var = tk.StringVar(value="0.2")
+        self.tileset_var = tk.StringVar(value="Classic")
+        self.custom_tile_var = tk.StringVar(value="")
+        self.custom_weight_var = tk.StringVar(value="0.10")
 
-        self._labeled_entry(controls, "Width", self.width_var, 0)
-        self._labeled_entry(controls, "Height", self.height_var, 1)
+        self._labeled_entry(controls, "Board Width", self.width_var, 0)
+        self._labeled_entry(controls, "Board Height", self.height_var, 1)
         self._labeled_entry(controls, "Seed (optional)", self.seed_var, 2)
-        self._labeled_entry(controls, "Weights", self.weights_var, 3, width=34)
-        self._labeled_entry(controls, "Smoothing", self.smoothing_var, 4)
-        self._labeled_entry(controls, "Cluster Bias", self.cluster_var, 5)
+        self._labeled_entry(controls, "Terrain Weights", self.weights_var, 3, width=34)
+        self._labeled_entry(controls, "Smoothing Passes", self.smoothing_var, 4)
+        self._labeled_entry(controls, "Cluster Bias (0-1)", self.cluster_var, 5)
 
-        tk.Label(controls, text="Symmetry").grid(row=0, column=6, padx=(12, 4), pady=2, sticky="w")
+        tk.Label(controls, text="Symmetry", bg="#1C2541", fg="#F8F9FA").grid(row=0, column=6, padx=(12, 4), pady=2, sticky="w")
         tk.OptionMenu(controls, self.symmetry_var, "none", "horizontal", "vertical", "both").grid(
             row=0, column=7, padx=4, pady=2, sticky="w"
         )
 
-        tk.Button(controls, text="Generate Board", command=self.generate).grid(
+        tk.Label(controls, text="Tile Theme", bg="#1C2541", fg="#F8F9FA").grid(row=0, column=8, padx=(12, 4), pady=2, sticky="w")
+        tk.OptionMenu(controls, self.tileset_var, *TILESET_PRESETS.keys()).grid(
+            row=0, column=9, padx=4, pady=2, sticky="w"
+        )
+        self._styled_button(controls, "Apply Theme", self.apply_tileset).grid(
+            row=1, column=8, columnspan=2, sticky="ew", padx=4, pady=2
+        )
+
+        tk.Label(controls, text="Add Custom Tile", bg="#1C2541", fg="#F8F9FA").grid(row=2, column=0, padx=4, pady=(8, 2), sticky="w")
+        tk.Entry(controls, textvariable=self.custom_tile_var, width=5).grid(row=2, column=1, padx=4, pady=(8, 2), sticky="w")
+        tk.Label(controls, text="Weight", bg="#1C2541", fg="#F8F9FA").grid(row=2, column=2, padx=4, pady=(8, 2), sticky="e")
+        tk.Entry(controls, textvariable=self.custom_weight_var, width=8).grid(row=2, column=3, padx=4, pady=(8, 2), sticky="w")
+        self._styled_button(controls, "Add Tile", self.add_custom_tile).grid(row=2, column=4, padx=4, pady=(8, 2), sticky="w")
+
+        tk.Label(
+            controls,
+            text="Weights format: Symbol:Weight separated by commas (example: .:0.5,F:0.2,W:0.3)",
+            bg="#1C2541",
+            fg="#C8D3F5",
+            font=("Helvetica", 9),
+        ).grid(row=3, column=0, columnspan=10, padx=4, pady=(6, 2), sticky="w")
+
+        self._styled_button(controls, "Generate Board", self.generate).grid(
             row=1, column=6, columnspan=2, sticky="ew", padx=4, pady=2
         )
-        tk.Button(controls, text="Save Board...", command=self.save_board).grid(
+        self._styled_button(controls, "Save Board...", self.save_board).grid(
             row=2, column=6, columnspan=2, sticky="ew", padx=4, pady=2
         )
 
-        self.output = tk.Text(root, wrap="none", width=120, height=40)
-        self.output.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        legend = tk.LabelFrame(
+            root,
+            text="Tile Legend",
+            bg="#1C2541",
+            fg="#F8F9FA",
+            padx=8,
+            pady=8,
+            font=("Helvetica", 10, "bold"),
+        )
+        legend.pack(fill="x", padx=12, pady=(2, 6))
+        self.legend_frame = legend
 
+        self.output = tk.Text(
+            root,
+            wrap="none",
+            width=120,
+            height=36,
+            bg="#0F172A",
+            fg="#E2E8F0",
+            insertbackground="#F8FAFC",
+            relief="flat",
+            padx=10,
+            pady=10,
+            font=("Consolas", 11),
+        )
+        self.output.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        self.refresh_legend()
         self.generate()
 
     def _labeled_entry(self, parent: tk.Widget, label: str, var: tk.StringVar, col: int, width: int = 10) -> None:
-        tk.Label(parent, text=label).grid(row=0, column=col, padx=4, pady=2, sticky="w")
+        tk.Label(parent, text=label, bg="#1C2541", fg="#F8F9FA").grid(row=0, column=col, padx=4, pady=2, sticky="w")
         tk.Entry(parent, textvariable=var, width=width).grid(row=1, column=col, padx=4, pady=2, sticky="w")
+
+    def _styled_button(self, parent: tk.Widget, label: str, command) -> tk.Button:
+        return tk.Button(
+            parent,
+            text=label,
+            command=command,
+            bg="#3A86FF",
+            fg="white",
+            activebackground="#2667CC",
+            activeforeground="white",
+            relief="flat",
+            padx=8,
+            pady=5,
+            cursor="hand2",
+            font=("Helvetica", 10, "bold"),
+        )
+
+    def apply_tileset(self) -> None:
+        chosen = TILESET_PRESETS[self.tileset_var.get()]
+        self.weights_var.set(",".join(f"{symbol}:{weight:.2f}" for symbol, weight in chosen.items()))
+        self.refresh_legend()
+
+    def add_custom_tile(self) -> None:
+        symbol = self.custom_tile_var.get().strip()
+        if len(symbol) != 1:
+            messagebox.showerror("Invalid tile", "Custom tile symbol must be exactly one character.")
+            return
+        try:
+            weight = float(self.custom_weight_var.get().strip())
+        except ValueError:
+            messagebox.showerror("Invalid weight", "Custom tile weight must be numeric.")
+            return
+        if weight < 0:
+            messagebox.showerror("Invalid weight", "Custom tile weight cannot be negative.")
+            return
+
+        weights = parse_weights(self.weights_var.get())
+        weights[symbol] = weight
+        self.weights_var.set(",".join(f"{tile}:{value:.2f}" for tile, value in weights.items()))
+        if symbol not in TILE_COLORS:
+            TILE_COLORS[symbol] = "#F8F9FA"
+            TILE_NAMES[symbol] = f"Tile '{symbol}'"
+        self.refresh_legend()
+
+    def refresh_legend(self) -> None:
+        for child in self.legend_frame.winfo_children():
+            child.destroy()
+
+        tk.Label(
+            self.legend_frame,
+            text="Visual map key for terrain symbols",
+            bg="#1C2541",
+            fg="#C8D3F5",
+            font=("Helvetica", 9),
+        ).pack(anchor="w")
+
+        row = tk.Frame(self.legend_frame, bg="#1C2541")
+        row.pack(fill="x", pady=(6, 0))
+        for symbol, color in TILE_COLORS.items():
+            chip = tk.Label(
+                row,
+                text=f" {symbol} {TILE_NAMES.get(symbol, 'Custom')} ",
+                bg=color,
+                fg="#111827",
+                padx=5,
+                pady=3,
+                font=("Helvetica", 9, "bold"),
+            )
+            chip.pack(side="left", padx=(0, 6), pady=2)
 
     def _build_options(self) -> BoardOptions:
         seed_text = self.seed_var.get().strip()
@@ -214,8 +390,20 @@ class BoardGeneratorApp:
             self.board_text = board_to_string(board)
             self.output.delete("1.0", tk.END)
             self.output.insert("1.0", self.board_text)
+            self._colorize_output(board)
+            self.refresh_legend()
         except Exception as exc:
             messagebox.showerror("Invalid options", str(exc))
+
+    def _colorize_output(self, board: Board) -> None:
+        for symbol, color in TILE_COLORS.items():
+            self.output.tag_config(f"tile_{symbol}", foreground=color)
+
+        for y, row in enumerate(board, start=1):
+            for x, symbol in enumerate(row):
+                col_start = x * 2
+                col_end = col_start + 1
+                self.output.tag_add(f"tile_{symbol}", f"{y}.{col_start}", f"{y}.{col_end}")
 
     def save_board(self) -> None:
         if not self.board_text.strip():
