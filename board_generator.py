@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import argparse
 import random
+import sys
 from typing import Dict, List, Sequence, Tuple
 
 
@@ -138,6 +139,19 @@ def parse_weights(text: str) -> Dict[CellType, float]:
     return weights
 
 
+def should_pause_on_exit(argv: Sequence[str]) -> bool:
+    """Pause when launched by double-click so the window does not close instantly."""
+    return len(argv) == 1 and sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def maybe_pause_on_exit(should_pause: bool) -> None:
+    if should_pause:
+        input("\nPress Enter to close...")
+
+
+def main() -> None:
+    pause_on_exit = should_pause_on_exit(sys.argv)
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a randomized board-game grid")
     parser.add_argument("--width", type=int, default=50)
@@ -156,6 +170,12 @@ def main() -> None:
     )
     parser.add_argument("--smoothing", type=int, default=1)
     parser.add_argument("--cluster-bias", type=float, default=0.2)
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="",
+        help="optional file path to save the generated board text",
+    )
 
     args = parser.parse_args()
 
@@ -170,6 +190,19 @@ def main() -> None:
     )
 
     board = generate_board(options)
+    board_text = board_to_string(board)
+    print(board_text)
+
+    output_path = args.output
+    if pause_on_exit and not output_path:
+        output_path = "generated_board.txt"
+
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as output_file:
+            output_file.write(board_text)
+        print(f"\nSaved board to: {output_path}")
+
+    maybe_pause_on_exit(pause_on_exit)
     print(board_to_string(board))
 
 

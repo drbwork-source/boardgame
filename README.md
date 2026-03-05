@@ -14,6 +14,8 @@ That prints a random 50x50 board using default terrain symbols:
 - `M` mountain
 - `W` water
 
+If you run it by double-clicking the `.py` file on desktop, it now keeps the window open and also saves the board to `generated_board.txt` so the result is not lost.
+
 ## Customize layout
 
 Example:
@@ -34,6 +36,7 @@ python board_generator.py \
 - `--symmetry`: `none`, `horizontal`, `vertical`, or `both`
 - `--smoothing`: number of neighborhood-smoothing passes
 - `--cluster-bias`: `0.0` to `1.0`; higher values make clumps of terrain
+- `--output`: optional file path to save the board text
 
 ## Use in your own code
 
