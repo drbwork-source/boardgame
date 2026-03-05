@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import binascii
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 import random
@@ -70,7 +71,19 @@ TILE_NAMES: Dict[CellType, str] = {
     "O": "Oasis",
     "V": "Volcanic",
     "A": "Ashlands",
+    "S": "Start",
+    "E": "End",
+    "C": "Checkpoint",
 }
+
+TILE_COLORS.update({"S": "#22C55E", "E": "#F43F5E", "C": "#FBBF24"})
+TILE_STYLES.update(
+    {
+        "S": {"fg": "#052E16", "bg": "#86EFAC", "glyph": "S"},
+        "E": {"fg": "#4C0519", "bg": "#FDA4AF", "glyph": "E"},
+        "C": {"fg": "#78350F", "bg": "#FDE68A", "glyph": "◆"},
+    }
+)
 
 
 @dataclass
@@ -89,6 +102,10 @@ class BoardOptions:
     symmetry: str = "none"  # none|horizontal|vertical|both
     smoothing_passes: int = 1
     cluster_bias: float = 0.2
+    auto_place_start_end: bool = False
+    start_end_min_distance: int = 20
+    safe_segment_length: int = 0
+    checkpoint_interval: int = 0
 
     def validate(self) -> None:
         if self.width <= 0 or self.height <= 0:
@@ -103,6 +120,12 @@ class BoardOptions:
             raise ValueError("terrain_weights cannot be empty")
         if sum(self.terrain_weights.values()) <= 0:
             raise ValueError("terrain_weights must sum to a positive number")
+        if self.start_end_min_distance < 0:
+            raise ValueError("start_end_min_distance cannot be negative")
+        if self.safe_segment_length < 0:
+            raise ValueError("safe_segment_length cannot be negative")
+        if self.checkpoint_interval < 0:
+            raise ValueError("checkpoint_interval cannot be negative")
 
 
 def weighted_choice(rng: random.Random, weights: Dict[CellType, float]) -> CellType:
@@ -167,7 +190,97 @@ def generate_board(options: BoardOptions) -> Board:
         board = next_board
 
     apply_symmetry(board, options.symmetry)
+    if options.auto_place_start_end:
+        _apply_progression_features(board, options, rng)
     return board
+
+
+def _manhattan(a: Tuple[int, int], b: Tuple[int, int]) -> int:
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+def _find_start_end_positions(width: int, height: int, min_distance: int) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    corners = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+    valid_pairs: List[Tuple[Tuple[int, int], Tuple[int, int]]] = []
+    for i, start in enumerate(corners):
+        for end in corners[i + 1 :]:
+            if _manhattan(start, end) >= min_distance:
+                valid_pairs.append((start, end))
+    if valid_pairs:
+        return max(valid_pairs, key=lambda pair: _manhattan(pair[0], pair[1]))
+    return (0, 0), (width - 1, height - 1)
+
+
+def _build_path(start: Tuple[int, int], end: Tuple[int, int]) -> List[Tuple[int, int]]:
+    sx, sy = start
+    ex, ey = end
+    path: List[Tuple[int, int]] = [(sx, sy)]
+    x, y = sx, sy
+
+    while x != ex:
+        x += 1 if ex > x else -1
+        path.append((x, y))
+    while y != ey:
+        y += 1 if ey > y else -1
+        path.append((x, y))
+
+    return path
+
+
+def _apply_progression_features(board: Board, options: BoardOptions, rng: random.Random) -> None:
+    height = len(board)
+    width = len(board[0]) if height else 0
+    if width == 0 or height == 0:
+        return
+
+    start, end = _find_start_end_positions(width, height, options.start_end_min_distance)
+    base_path = _build_path(start, end)
+
+    if rng.random() < 0.5:
+        base_path.reverse()
+        start, end = end, start
+
+    safe_budget = options.safe_segment_length
+    for idx, (x, y) in enumerate(base_path):
+        if idx < safe_budget or idx >= len(base_path) - safe_budget:
+            board[y][x] = "."
+
+    if options.checkpoint_interval > 0:
+        for idx in range(options.checkpoint_interval, len(base_path) - 1, options.checkpoint_interval):
+            cx, cy = base_path[idx]
+            board[cy][cx] = "C"
+
+    sx, sy = start
+    ex, ey = end
+    board[sy][sx] = "S"
+    board[ey][ex] = "E"
+
+
+def validate_progression_path(board: Board) -> Tuple[bool, str]:
+    height = len(board)
+    width = len(board[0]) if height else 0
+    starts = [(x, y) for y in range(height) for x in range(width) if board[y][x] == "S"]
+    ends = [(x, y) for y in range(height) for x in range(width) if board[y][x] == "E"]
+
+    if len(starts) != 1 or len(ends) != 1:
+        return False, "Board must contain exactly one start tile (S) and one end tile (E)."
+
+    start = starts[0]
+    target = ends[0]
+    seen = {start}
+    queue = deque([(start, 0)])
+
+    while queue:
+        (x, y), dist = queue.popleft()
+        if (x, y) == target:
+            return True, f"Valid path found: start-to-end route length is {dist} steps."
+
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in seen:
+                seen.add((nx, ny))
+                queue.append(((nx, ny), dist + 1))
+
+    return False, "No valid route from start (S) to end (E)."
 
 
 def board_to_string(board: Board) -> str:
@@ -771,9 +884,18 @@ def run_cli(args: argparse.Namespace) -> None:
         symmetry=args.symmetry,
         smoothing_passes=args.smoothing,
         cluster_bias=args.cluster_bias,
+        auto_place_start_end=args.auto_start_end,
+        start_end_min_distance=args.min_distance,
+        safe_segment_length=args.safe_segments,
+        checkpoint_interval=args.checkpoint_interval,
     )
-    board_text = board_to_string(generate_board(options))
+    board = generate_board(options)
+    board_text = board_to_string(board)
     print(board_text)
+    if args.auto_start_end:
+        valid, summary = validate_progression_path(board)
+        prefix = "[Path OK]" if valid else "[Path INVALID]"
+        print(f"\n{prefix} {summary}")
     if args.output:
         Path(args.output).write_text(board_text, encoding="utf-8")
         print(f"\nSaved board to: {args.output}")
@@ -789,6 +911,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--symmetry", choices=["none", "horizontal", "vertical", "both"], default="none")
     parser.add_argument("--smoothing", type=int, default=1)
     parser.add_argument("--cluster-bias", type=float, default=0.2)
+    parser.add_argument("--auto-start-end", action="store_true", help="auto-place S/E tiles and progression checkpoints")
+    parser.add_argument("--min-distance", type=int, default=20, help="minimum Manhattan distance between auto-placed S and E")
+    parser.add_argument("--safe-segments", type=int, default=0, help="number of first/last route tiles converted to safe plains")
+    parser.add_argument("--checkpoint-interval", type=int, default=0, help="place C tiles every N steps along the main route")
     parser.add_argument("--output", type=str, default="")
     return parser
 
