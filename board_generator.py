@@ -360,7 +360,7 @@ class BoardGeneratorApp:
         weights[symbol] = weight
         self.weights_var.set(",".join(f"{tile}:{value:.2f}" for tile, value in weights.items()))
         if symbol not in TILE_COLORS:
-            TILE_COLORS[symbol] = "#F8F9FA"
+            TILE_COLORS[symbol] = "#E2E8F0"
             TILE_NAMES[symbol] = f"Tile '{symbol}'"
             TILE_STYLES[symbol] = {"fg": "#111827", "bg": "#F8FAFC", "glyph": symbol}
         self.refresh_legend()
