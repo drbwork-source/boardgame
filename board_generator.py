@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import random
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from typing import Dict, List, Sequence, Tuple
 
 
@@ -206,6 +206,8 @@ class BoardGeneratorApp:
         self.root.title("Board Generator (50x50)")
         self.root.configure(bg="#0B132B")
         self.board_text = ""
+        self.current_board: Board = []
+        self.tile_size = 20
 
         header = tk.Frame(root, bg="#0B132B")
         header.pack(fill="x", padx=14, pady=(12, 2))
@@ -299,20 +301,63 @@ class BoardGeneratorApp:
         legend.pack(fill="x", padx=12, pady=(2, 6))
         self.legend_frame = legend
 
-        self.output = tk.Text(
+        board_frame = tk.LabelFrame(
             root,
-            wrap="none",
-            width=120,
-            height=36,
-            bg="#0F172A",
-            fg="#E2E8F0",
-            insertbackground="#F8FAFC",
-            relief="flat",
-            padx=10,
-            pady=10,
-            font=("Consolas", 11),
+            text="Board Preview",
+            bg="#1C2541",
+            fg="#F8F9FA",
+            padx=8,
+            pady=8,
+            font=("Helvetica", 10, "bold"),
         )
-        self.output.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        board_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        preview_header = tk.Frame(board_frame, bg="#1C2541")
+        preview_header.pack(fill="x", pady=(0, 6))
+        tk.Label(
+            preview_header,
+            text="Uniform square tiles with high-contrast borders for clear readability.",
+            bg="#1C2541",
+            fg="#C8D3F5",
+            font=("Helvetica", 9),
+        ).pack(side="left")
+
+        self.size_var = tk.IntVar(value=self.tile_size)
+        tk.Label(preview_header, text="Tile Size", bg="#1C2541", fg="#F8F9FA").pack(side="right", padx=(8, 4))
+        size_scale = tk.Scale(
+            preview_header,
+            variable=self.size_var,
+            from_=12,
+            to=32,
+            orient="horizontal",
+            command=self._on_tile_size_change,
+            bg="#1C2541",
+            fg="#F8F9FA",
+            highlightthickness=0,
+            troughcolor="#0F172A",
+            activebackground="#3A86FF",
+            length=140,
+        )
+        size_scale.pack(side="right")
+
+        canvas_shell = tk.Frame(board_frame, bg="#0F172A")
+        canvas_shell.pack(fill="both", expand=True)
+
+        self.board_canvas = tk.Canvas(
+            canvas_shell,
+            bg="#0B1020",
+            highlightthickness=0,
+            relief="flat",
+        )
+        x_scroll = ttk.Scrollbar(canvas_shell, orient="horizontal", command=self.board_canvas.xview)
+        y_scroll = ttk.Scrollbar(canvas_shell, orient="vertical", command=self.board_canvas.yview)
+        self.board_canvas.configure(xscrollcommand=x_scroll.set, yscrollcommand=y_scroll.set)
+
+        self.board_canvas.grid(row=0, column=0, sticky="nsew")
+        y_scroll.grid(row=0, column=1, sticky="ns")
+        x_scroll.grid(row=1, column=0, sticky="ew")
+        canvas_shell.grid_columnconfigure(0, weight=1)
+        canvas_shell.grid_rowconfigure(0, weight=1)
 
         self.refresh_legend()
         self.generate()
@@ -409,32 +454,55 @@ class BoardGeneratorApp:
         try:
             options = self._build_options()
             board = generate_board(options)
+            self.current_board = board
             self.board_text = board_to_string(board)
-            display_text = board_to_display_string(board)
-            self.output.delete("1.0", tk.END)
-            self.output.insert("1.0", display_text)
-            self._colorize_output(board)
+            self._draw_board(board)
             self.refresh_legend()
         except Exception as exc:
             messagebox.showerror("Invalid options", str(exc))
 
-    def _colorize_output(self, board: Board) -> None:
-        for symbol, style in TILE_STYLES.items():
-            self.output.tag_config(
-                f"tile_{symbol}",
-                foreground=style["fg"],
-                background=style["bg"],
-                font=("Consolas", 11, "bold"),
-            )
+    def _on_tile_size_change(self, _value: str) -> None:
+        self.tile_size = self.size_var.get()
+        if self.current_board:
+            self._draw_board(self.current_board)
 
-        for y, row in enumerate(board, start=1):
+    def _draw_board(self, board: Board) -> None:
+        self.board_canvas.delete("all")
+        if not board:
+            self.board_canvas.configure(scrollregion=(0, 0, 0, 0))
+            return
+
+        tile = self.tile_size
+        border_color = "#0F172A"
+
+        for y, row in enumerate(board):
             for x, symbol in enumerate(row):
-                col_start = x * 2
-                col_end = col_start + 1
-                tag_name = f"tile_{symbol}" if symbol in TILE_STYLES else "tile_unknown"
-                if tag_name == "tile_unknown":
-                    self.output.tag_config("tile_unknown", foreground="#111827", background="#F8FAFC", font=("Consolas", 11, "bold"))
-                self.output.tag_add(tag_name, f"{y}.{col_start}", f"{y}.{col_end}")
+                style = TILE_STYLES.get(symbol, {"fg": "#111827", "bg": "#F8FAFC", "glyph": symbol})
+                color = TILE_COLORS.get(symbol, style["bg"])
+                x0 = x * tile
+                y0 = y * tile
+                x1 = x0 + tile
+                y1 = y0 + tile
+                self.board_canvas.create_rectangle(
+                    x0,
+                    y0,
+                    x1,
+                    y1,
+                    fill=color,
+                    outline=border_color,
+                    width=1,
+                )
+                self.board_canvas.create_text(
+                    x0 + tile / 2,
+                    y0 + tile / 2,
+                    text=style.get("glyph", symbol),
+                    fill=style["fg"],
+                    font=("Consolas", max(8, tile // 2), "bold"),
+                )
+
+        width = len(board[0]) * tile
+        height = len(board) * tile
+        self.board_canvas.configure(scrollregion=(0, 0, width, height))
 
     def save_board(self) -> None:
         if not self.board_text.strip():
