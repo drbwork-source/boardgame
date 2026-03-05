@@ -38,15 +38,15 @@ TILE_COLORS: Dict[CellType, str] = {
 }
 
 TILE_STYLES: Dict[CellType, Dict[str, str]] = {
-    ".": {"fg": "#14532D", "bg": "#CDE7A6", "glyph": "."},
-    "F": {"fg": "#14532D", "bg": "#86EFAC", "glyph": "T"},
-    "M": {"fg": "#1F2937", "bg": "#CBD5E1", "glyph": "^"},
-    "W": {"fg": "#0C4A6E", "bg": "#93C5FD", "glyph": "~"},
-    "B": {"fg": "#713F12", "bg": "#FDE68A", "glyph": "="},
-    "D": {"fg": "#7C2D12", "bg": "#FDBA74", "glyph": ":"},
-    "O": {"fg": "#0E7490", "bg": "#FEF3C7", "glyph": "o"},
-    "V": {"fg": "#F8FAFC", "bg": "#7F1D1D", "glyph": "*"},
-    "A": {"fg": "#F1F5F9", "bg": "#475569", "glyph": "#"},
+    ".": {"fg": "#2F5233", "bg": "#CDE7A6", "glyph": "·"},
+    "F": {"fg": "#0B3D20", "bg": "#7BC47F", "glyph": "♣"},
+    "M": {"fg": "#2F3640", "bg": "#C7D0E0", "glyph": "▲"},
+    "W": {"fg": "#0C4A6E", "bg": "#99D5E4", "glyph": "≈"},
+    "B": {"fg": "#7A5C1E", "bg": "#F7E5A4", "glyph": "░"},
+    "D": {"fg": "#7F3D00", "bg": "#F9C79B", "glyph": "▤"},
+    "O": {"fg": "#155E75", "bg": "#FFE6AF", "glyph": "◉"},
+    "V": {"fg": "#F8FAFC", "bg": "#7F1D1D", "glyph": "✹"},
+    "A": {"fg": "#E5E7EB", "bg": "#4B5563", "glyph": "¤"},
 }
 
 TILE_NAMES: Dict[CellType, str] = {
@@ -166,8 +166,8 @@ def board_to_string(board: Board) -> str:
 def board_to_display_string(board: Board) -> str:
     display_rows: List[str] = []
     for row in board:
-        glyph_row = [f"[{TILE_STYLES.get(symbol, {'glyph': symbol})['glyph']}]" for symbol in row]
-        display_rows.append("".join(glyph_row))
+        glyph_row = [TILE_STYLES.get(symbol, {"glyph": symbol})["glyph"] for symbol in row]
+        display_rows.append(" ".join(glyph_row))
     return "\n".join(display_rows)
 
 
@@ -362,7 +362,7 @@ class BoardGeneratorApp:
         if symbol not in TILE_COLORS:
             TILE_COLORS[symbol] = "#E2E8F0"
             TILE_NAMES[symbol] = f"Tile '{symbol}'"
-            TILE_STYLES[symbol] = {"fg": "#111827", "bg": "#E2E8F0", "glyph": symbol}
+            TILE_STYLES[symbol] = {"fg": "#111827", "bg": "#F8FAFC", "glyph": symbol}
         self.refresh_legend()
 
     def refresh_legend(self) -> None:
@@ -419,8 +419,6 @@ class BoardGeneratorApp:
             messagebox.showerror("Invalid options", str(exc))
 
     def _colorize_output(self, board: Board) -> None:
-        self.output.tag_config("grid", foreground="#64748B", font=("Consolas", 11, "bold"))
-
         for symbol, style in TILE_STYLES.items():
             self.output.tag_config(
                 f"tile_{symbol}",
@@ -429,17 +427,14 @@ class BoardGeneratorApp:
                 font=("Consolas", 11, "bold"),
             )
 
-        self.output.tag_config("tile_unknown", foreground="#111827", background="#E2E8F0", font=("Consolas", 11, "bold"))
-
         for y, row in enumerate(board, start=1):
             for x, symbol in enumerate(row):
-                left = x * 3
-                mid = left + 1
-                right = left + 2
-                self.output.tag_add("grid", f"{y}.{left}", f"{y}.{left + 1}")
-                self.output.tag_add("grid", f"{y}.{right}", f"{y}.{right + 1}")
+                col_start = x * 2
+                col_end = col_start + 1
                 tag_name = f"tile_{symbol}" if symbol in TILE_STYLES else "tile_unknown"
-                self.output.tag_add(tag_name, f"{y}.{mid}", f"{y}.{mid + 1}")
+                if tag_name == "tile_unknown":
+                    self.output.tag_config("tile_unknown", foreground="#111827", background="#F8FAFC", font=("Consolas", 11, "bold"))
+                self.output.tag_add(tag_name, f"{y}.{col_start}", f"{y}.{col_end}")
 
     def save_board(self) -> None:
         if not self.board_text.strip():
