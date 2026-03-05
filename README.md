@@ -46,3 +46,7 @@ options = BoardOptions(width=50, height=50, seed=None)
 board = generate_board(options)
 print(board_to_string(board))
 ```
+
+## Planning next features
+
+See [`IDEAS.md`](IDEAS.md) for a structured roadmap of feature ideas focused on pathing, tile rules, card decks, balancing, and print/table usability.
