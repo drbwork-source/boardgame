@@ -152,6 +152,7 @@ def maybe_pause_on_exit(should_pause: bool) -> None:
 def main() -> None:
     pause_on_exit = should_pause_on_exit(sys.argv)
 
+def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a randomized board-game grid")
     parser.add_argument("--width", type=int, default=50)
     parser.add_argument("--height", type=int, default=50)
@@ -202,6 +203,7 @@ def main() -> None:
         print(f"\nSaved board to: {output_path}")
 
     maybe_pause_on_exit(pause_on_exit)
+    print(board_to_string(board))
 
 
 if __name__ == "__main__":
