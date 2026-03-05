@@ -7,13 +7,16 @@
 from __future__ import annotations
 
 import argparse
+import binascii
 from dataclasses import dataclass, field
 from pathlib import Path
 import random
+import struct
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Dict, List, Sequence, Tuple
 import importlib.util
+import zlib
 
 if importlib.util.find_spec("PIL") is not None:
     from PIL import Image, ImageDraw, ImageFont
@@ -216,8 +219,10 @@ class BoardGeneratorApp:
         self.board_text = ""
         self.current_board: Board = []
         self.tile_size = 20
-        self.edit_mode_var = tk.BooleanVar(value=False)
+        self.mode_var = tk.StringVar(value="viewer")
         self.paint_tile_var = tk.StringVar(value=".")
+        self.board_origin_x = 0
+        self.board_origin_y = 0
 
         header = tk.Frame(root, bg="#0B132B")
         header.pack(fill="x", padx=14, pady=(12, 2))
@@ -236,8 +241,75 @@ class BoardGeneratorApp:
             fg="#C8D3F5",
         ).pack(anchor="w", pady=(2, 6))
 
+        app_body = tk.Frame(root, bg="#0B132B")
+        app_body.pack(fill="both", expand=True, padx=12, pady=(4, 12))
+
+        sidebar = tk.LabelFrame(
+            app_body,
+            text="Mode",
+            bg="#1C2541",
+            fg="#F8F9FA",
+            padx=10,
+            pady=8,
+            font=("Helvetica", 10, "bold"),
+        )
+        sidebar.pack(side="left", fill="y", padx=(0, 10))
+
+        tk.Label(
+            sidebar,
+            text="Select how you use the board",
+            bg="#1C2541",
+            fg="#C8D3F5",
+            font=("Helvetica", 9),
+        ).pack(anchor="w", pady=(0, 8))
+
+        tk.Radiobutton(
+            sidebar,
+            text="Viewer Mode",
+            variable=self.mode_var,
+            value="viewer",
+            command=self._update_mode_ui,
+            bg="#1C2541",
+            fg="#F8F9FA",
+            activebackground="#1C2541",
+            activeforeground="#F8F9FA",
+            selectcolor="#0F172A",
+            highlightthickness=0,
+        ).pack(anchor="w", pady=2)
+        tk.Radiobutton(
+            sidebar,
+            text="Editor Mode",
+            variable=self.mode_var,
+            value="editor",
+            command=self._update_mode_ui,
+            bg="#1C2541",
+            fg="#F8F9FA",
+            activebackground="#1C2541",
+            activeforeground="#F8F9FA",
+            selectcolor="#0F172A",
+            highlightthickness=0,
+        ).pack(anchor="w", pady=2)
+
+        self.editor_hint_label = tk.Label(
+            sidebar,
+            text="Use editor mode to paint on tiles.",
+            bg="#1C2541",
+            fg="#C8D3F5",
+            font=("Helvetica", 9),
+            justify="left",
+            wraplength=170,
+        )
+        self.editor_hint_label.pack(anchor="w", pady=(8, 4))
+
+        tk.Label(sidebar, text="Paint Tile", bg="#1C2541", fg="#F8F9FA").pack(anchor="w", pady=(6, 2))
+        self.paint_tile_menu = tk.OptionMenu(sidebar, self.paint_tile_var, *sorted(TILE_COLORS.keys()))
+        self.paint_tile_menu.pack(anchor="w", fill="x")
+
+        main_content = tk.Frame(app_body, bg="#0B132B")
+        main_content.pack(side="left", fill="both", expand=True)
+
         controls = tk.LabelFrame(
-            root,
+            main_content,
             text="Generation Controls",
             bg="#1C2541",
             fg="#F8F9FA",
@@ -245,7 +317,7 @@ class BoardGeneratorApp:
             pady=6,
             font=("Helvetica", 10, "bold"),
         )
-        controls.pack(fill="x", padx=12, pady=8)
+        controls.pack(fill="x", padx=0, pady=(0, 8))
 
         self.width_var = tk.StringVar(value="50")
         self.height_var = tk.StringVar(value="50")
@@ -302,25 +374,8 @@ class BoardGeneratorApp:
             row=3, column=6, columnspan=2, sticky="ew", padx=4, pady=(2, 6)
         )
 
-        tk.Checkbutton(
-            controls,
-            text="Editor Mode",
-            variable=self.edit_mode_var,
-            bg="#1C2541",
-            fg="#F8F9FA",
-            activebackground="#1C2541",
-            activeforeground="#F8F9FA",
-            selectcolor="#0F172A",
-            highlightthickness=0,
-        ).grid(row=1, column=0, columnspan=2, padx=4, pady=(6, 2), sticky="w")
-        tk.Label(controls, text="Paint Tile", bg="#1C2541", fg="#F8F9FA").grid(
-            row=1, column=2, padx=4, pady=(6, 2), sticky="e"
-        )
-        self.paint_tile_menu = tk.OptionMenu(controls, self.paint_tile_var, *sorted(TILE_COLORS.keys()))
-        self.paint_tile_menu.grid(row=1, column=3, padx=4, pady=(6, 2), sticky="w")
-
         legend = tk.LabelFrame(
-            root,
+            main_content,
             text="Tile Legend",
             bg="#1C2541",
             fg="#F8F9FA",
@@ -328,11 +383,11 @@ class BoardGeneratorApp:
             pady=8,
             font=("Helvetica", 10, "bold"),
         )
-        legend.pack(fill="x", padx=12, pady=(2, 6))
+        legend.pack(fill="x", padx=0, pady=(2, 6))
         self.legend_frame = legend
 
         board_frame = tk.LabelFrame(
-            root,
+            main_content,
             text="Board Preview",
             bg="#1C2541",
             fg="#F8F9FA",
@@ -340,7 +395,7 @@ class BoardGeneratorApp:
             pady=8,
             font=("Helvetica", 10, "bold"),
         )
-        board_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        board_frame.pack(fill="both", expand=True, padx=0, pady=(0, 0))
 
         preview_header = tk.Frame(board_frame, bg="#1C2541")
         preview_header.pack(fill="x", pady=(0, 6))
@@ -391,8 +446,10 @@ class BoardGeneratorApp:
 
         self.board_canvas.bind("<Button-1>", self._paint_tile)
         self.board_canvas.bind("<B1-Motion>", self._paint_tile)
+        self.board_canvas.bind("<Configure>", self._on_canvas_resize)
 
         self.refresh_legend()
+        self._update_mode_ui()
         self.generate()
 
     def _labeled_entry(self, parent: tk.Widget, label: str, var: tk.StringVar, col: int, width: int = 10) -> None:
@@ -452,6 +509,14 @@ class BoardGeneratorApp:
             menu.add_command(label=symbol, command=lambda value=symbol: self.paint_tile_var.set(value))
         if self.paint_tile_var.get() not in TILE_COLORS:
             self.paint_tile_var.set(sorted(TILE_COLORS.keys())[0])
+
+    def _update_mode_ui(self) -> None:
+        state = "normal" if self.mode_var.get() == "editor" else "disabled"
+        self.paint_tile_menu.configure(state=state)
+        if state == "disabled":
+            self.editor_hint_label.configure(text="Viewer mode selected. Switch to editor mode to paint tiles.")
+        else:
+            self.editor_hint_label.configure(text="Editor mode selected. Click or drag on the grid to paint tiles.")
 
     def refresh_legend(self) -> None:
         for child in self.legend_frame.winfo_children():
@@ -519,12 +584,19 @@ class BoardGeneratorApp:
         tile = self.tile_size
         border_color = "#0F172A"
 
+        width = len(board[0]) * tile
+        height = len(board) * tile
+        canvas_w = max(1, self.board_canvas.winfo_width())
+        canvas_h = max(1, self.board_canvas.winfo_height())
+        self.board_origin_x = max(12, (canvas_w - width) // 2)
+        self.board_origin_y = max(12, (canvas_h - height) // 2)
+
         for y, row in enumerate(board):
             for x, symbol in enumerate(row):
                 style = TILE_STYLES.get(symbol, {"fg": "#111827", "bg": "#F8FAFC", "glyph": symbol})
                 color = TILE_COLORS.get(symbol, style["bg"])
-                x0 = x * tile
-                y0 = y * tile
+                x0 = self.board_origin_x + (x * tile)
+                y0 = self.board_origin_y + (y * tile)
                 x1 = x0 + tile
                 y1 = y0 + tile
                 self.board_canvas.create_rectangle(
@@ -544,17 +616,23 @@ class BoardGeneratorApp:
                     font=("Consolas", max(8, tile // 2), "bold"),
                 )
 
-        width = len(board[0]) * tile
-        height = len(board) * tile
-        self.board_canvas.configure(scrollregion=(0, 0, width, height))
+        scroll_w = self.board_origin_x + width + 12
+        scroll_h = self.board_origin_y + height + 12
+        self.board_canvas.configure(scrollregion=(0, 0, scroll_w, scroll_h))
+
+    def _on_canvas_resize(self, _event: tk.Event) -> None:
+        if self.current_board:
+            self._draw_board(self.current_board)
 
     def _paint_tile(self, event: tk.Event) -> None:
-        if not self.edit_mode_var.get() or not self.current_board:
+        if self.mode_var.get() != "editor" or not self.current_board:
             return
 
         tile = self.tile_size
-        x = int(self.board_canvas.canvasx(event.x) // tile)
-        y = int(self.board_canvas.canvasy(event.y) // tile)
+        canvas_x = self.board_canvas.canvasx(event.x) - self.board_origin_x
+        canvas_y = self.board_canvas.canvasy(event.y) - self.board_origin_y
+        x = int(canvas_x // tile)
+        y = int(canvas_y // tile)
         if not (0 <= y < len(self.current_board) and 0 <= x < len(self.current_board[0])):
             return
 
@@ -586,22 +664,26 @@ class BoardGeneratorApp:
         if not self.current_board:
             messagebox.showwarning("Nothing to export", "Generate a board first.")
             return
-        if Image is None or ImageDraw is None:
-            messagebox.showerror(
-                "Pillow required",
-                "Image export requires Pillow. Install it with: pip install pillow",
-            )
-            return
-
+        pillow_available = Image is not None and ImageDraw is not None
+        filetypes = [("PNG image", "*.png")]
+        if pillow_available:
+            filetypes.append(("JPEG image", "*.jpg;*.jpeg"))
         path = filedialog.asksaveasfilename(
             title="Export board image",
             defaultextension=".png",
-            filetypes=[("PNG image", "*.png"), ("JPEG image", "*.jpg;*.jpeg")],
+            filetypes=filetypes,
             initialfile="generated_board.png",
         )
         if not path:
             return
 
+        if pillow_available:
+            self._export_with_pillow(path)
+        else:
+            self._export_png_without_pillow(path)
+        messagebox.showinfo("Export complete", f"Board image exported to:\n{path}")
+
+    def _export_with_pillow(self, path: str) -> None:
         tile = self.tile_size
         width = len(self.current_board[0]) * tile
         height = len(self.current_board) * tile
@@ -627,7 +709,51 @@ class BoardGeneratorApp:
                     draw.text((tx, ty), glyph, fill=style["fg"], font=font)
 
         image.save(path)
-        messagebox.showinfo("Export complete", f"Board image exported to:\n{path}")
+
+    def _export_png_without_pillow(self, path: str) -> None:
+        tile = self.tile_size
+        width = len(self.current_board[0]) * tile
+        height = len(self.current_board) * tile
+        pixels = bytearray(width * height * 3)
+
+        for y, row in enumerate(self.current_board):
+            for x, symbol in enumerate(row):
+                color = TILE_COLORS.get(symbol, "#F8FAFC")
+                r, g, b = self._hex_to_rgb(color)
+                for py in range(y * tile, (y + 1) * tile):
+                    row_start = py * width * 3
+                    for px in range(x * tile, (x + 1) * tile):
+                        idx = row_start + px * 3
+                        pixels[idx : idx + 3] = bytes((r, g, b))
+
+        self._write_png(path, width, height, bytes(pixels))
+
+    def _hex_to_rgb(self, color: str) -> Tuple[int, int, int]:
+        value = color.lstrip("#")
+        if len(value) == 3:
+            value = "".join(ch * 2 for ch in value)
+        return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
+
+    def _write_png(self, path: str, width: int, height: int, rgb_data: bytes) -> None:
+        scanlines = bytearray()
+        stride = width * 3
+        for y in range(height):
+            scanlines.append(0)
+            start = y * stride
+            scanlines.extend(rgb_data[start : start + stride])
+
+        def chunk(chunk_type: bytes, data: bytes) -> bytes:
+            crc = binascii.crc32(chunk_type)
+            crc = binascii.crc32(data, crc) & 0xFFFFFFFF
+            return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
+
+        png = bytearray()
+        png.extend(b"\x89PNG\r\n\x1a\n")
+        ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+        png.extend(chunk(b"IHDR", ihdr))
+        png.extend(chunk(b"IDAT", zlib.compress(bytes(scanlines), level=9)))
+        png.extend(chunk(b"IEND", b""))
+        Path(path).write_bytes(bytes(png))
 
 
 def run_gui() -> None:
