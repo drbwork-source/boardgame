@@ -163,6 +163,79 @@ export function OptionsPanel({
           ))}
         </select>
       </div>
+      <div className="row">
+        <label>Goal</label>
+        <select
+          value={options.goal_placement}
+          onChange={(e) =>
+            onOptionsChange({ ...options, goal_placement: e.target.value })}
+          style={{ minWidth: 90 }}
+        >
+          {(config?.goal_placement_choices ?? ["center", "random"]).map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+      <div className="row">
+        <label>Start pos</label>
+        <select
+          value={options.start_placement}
+          onChange={(e) =>
+            onOptionsChange({ ...options, start_placement: e.target.value })}
+          style={{ minWidth: 90 }}
+        >
+          {(config?.start_placement_choices ?? ["corners", "random"]).map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+      <div className="row">
+        <label>Min dist</label>
+        <input
+          type="number"
+          min={0}
+          value={options.min_goal_distance}
+          onChange={(e) =>
+            onOptionsChange({
+              ...options,
+              min_goal_distance: parseInt(e.target.value, 10) || 0,
+            })
+          }
+          style={{ width: 50 }}
+          title="Minimum steps from start to goal"
+        />
+      </div>
+      <div className="row">
+        <label>Safe r</label>
+        <input
+          type="number"
+          min={0}
+          value={options.safe_segment_radius}
+          onChange={(e) =>
+            onOptionsChange({
+              ...options,
+              safe_segment_radius: parseInt(e.target.value, 10) || 0,
+            })
+          }
+          style={{ width: 50 }}
+          title="Radius of safe tiles around starts/goal"
+        />
+      </div>
+      <div className="row">
+        <label>Checkpoints</label>
+        <input
+          type="number"
+          min={0}
+          value={options.num_checkpoints}
+          onChange={(e) =>
+            onOptionsChange({
+              ...options,
+              num_checkpoints: parseInt(e.target.value, 10) || 0,
+            })
+          }
+          style={{ width: 50 }}
+        />
+      </div>
       <div className="row" style={{ marginTop: 8, gap: 8, flexWrap: "wrap" }}>
         <button
           type="button"

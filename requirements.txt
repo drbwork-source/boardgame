@@ -1,0 +1,12 @@
+customtkinter>=5.2.0
+# Web UI backend
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+# Excel import for deck/card upload
+openpyxl>=3.1.0
+# Optional: for image export and print/card export
+# Pillow>=9.0.0
+# Tests
+pytest>=7.0.0
+httpx>=0.27.0

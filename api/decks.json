@@ -1,0 +1,183 @@
+{
+  "decks": {
+    "forest": {
+      "name": "Forest Deck",
+      "card_template_ids": [
+        "card_0"
+      ]
+    },
+    "mountain": {
+      "name": "Mountain Deck",
+      "card_template_ids": [
+        "card_1"
+      ]
+    },
+    "water": {
+      "name": "Water Deck",
+      "card_template_ids": [
+        "card_2"
+      ]
+    },
+    "beach": {
+      "name": "Beach Deck",
+      "card_template_ids": [
+        "card_3"
+      ]
+    },
+    "desert": {
+      "name": "Desert Deck",
+      "card_template_ids": [
+        "card_4"
+      ]
+    },
+    "oasis": {
+      "name": "Oasis Deck",
+      "card_template_ids": [
+        "card_5"
+      ]
+    },
+    "volcanic": {
+      "name": "Volcanic Deck",
+      "card_template_ids": [
+        "card_6"
+      ]
+    },
+    "ashlands": {
+      "name": "Ashlands Deck",
+      "card_template_ids": [
+        "card_7"
+      ]
+    },
+    "default": {
+      "name": "Default",
+      "card_template_ids": []
+    }
+  },
+  "card_templates": {
+    "card_0": {
+      "title": "test",
+      "body": "test",
+      "image_url": null,
+      "back_text": null
+    },
+    "card_1": {
+      "title": "New card",
+      "body": "",
+      "image_url": null,
+      "back_text": null
+    },
+    "card_2": {
+      "title": "New card",
+      "body": "",
+      "image_url": null,
+      "back_text": null
+    },
+    "card_3": {
+      "title": "New card",
+      "body": "",
+      "image_url": null,
+      "back_text": null
+    },
+    "card_4": {
+      "title": "New card",
+      "body": "",
+      "image_url": null,
+      "back_text": null
+    },
+    "card_5": {
+      "title": "New card",
+      "body": "",
+      "image_url": null,
+      "back_text": null
+    },
+    "card_6": {
+      "title": "New card",
+      "body": "",
+      "image_url": null,
+      "back_text": null
+    },
+    "card_7": {
+      "title": "New card",
+      "body": "",
+      "image_url": null,
+      "back_text": null
+    }
+  },
+  "tile_metadata": {
+    ".": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "default"
+    },
+    "F": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "forest"
+    },
+    "M": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "mountain"
+    },
+    "W": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "water"
+    },
+    "B": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "beach"
+    },
+    "D": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "desert"
+    },
+    "O": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "oasis"
+    },
+    "V": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "volcanic"
+    },
+    "A": {
+      "category": "terrain",
+      "difficulty": 0,
+      "deck_id": "ashlands"
+    },
+    "G": {
+      "category": "special",
+      "difficulty": 0,
+      "deck_id": "default"
+    },
+    "1": {
+      "category": "special",
+      "difficulty": 0,
+      "deck_id": "default"
+    },
+    "2": {
+      "category": "special",
+      "difficulty": 0,
+      "deck_id": "default"
+    },
+    "3": {
+      "category": "special",
+      "difficulty": 0,
+      "deck_id": "default"
+    },
+    "4": {
+      "category": "special",
+      "difficulty": 0,
+      "deck_id": "default"
+    },
+    "C": {
+      "category": "special",
+      "difficulty": 0,
+      "deck_id": "default"
+    }
+  }
+}
