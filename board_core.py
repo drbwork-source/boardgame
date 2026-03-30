@@ -28,6 +28,11 @@ CHECKPOINT_SYMBOL: CellType = "C"
 SPECIAL_SYMBOLS: set[CellType] = {GOAL_SYMBOL} | set(START_SYMBOLS) | {CHECKPOINT_SYMBOL}
 BLOCKED_TILES: set[CellType] = {"W"}
 GENERATION_MODE_CHOICES: tuple[str, str] = ("grid", "pathboard")
+# Short UI labels for dropdowns (maps mode id -> display string).
+GENERATION_MODE_LABELS: dict[str, str] = {
+    "grid": "Grid — full terrain board",
+    "pathboard": "Pathway — intertwined routes",
+}
 
 # ---------------------------------------------------------------------------
 # Unified tile definitions (single source of truth)

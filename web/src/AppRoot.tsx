@@ -91,6 +91,27 @@ export default function AppRoot() {
                 <Link to="/decks" className="deck-builder-nav-btn" title="Create and edit decks and cards for board tiles">
                   Decks & cards
                 </Link>
+                {!play.playMode && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>Generator</span>
+                    <select
+                      value={studio.options.generation_mode}
+                      onChange={(e) =>
+                        studio.setOptions((o) => ({ ...o, generation_mode: e.target.value }))
+                      }
+                      aria-label="Board generator: grid or pathway layout"
+                      style={{ maxWidth: 280 }}
+                    >
+                      {(studio.config?.generation_mode_choices ?? ["grid", "pathboard"]).map((m) => (
+                        <option key={m} value={m}>
+                          {m === "pathboard"
+                            ? "Pathway (routes)"
+                            : "Grid (terrain)"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label>
                   Tile size
                   <input

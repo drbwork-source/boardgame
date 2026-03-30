@@ -32,7 +32,7 @@ from board_core import (
     BOARD_PRESETS,
     BOARD_SIZE_MIN,
     BOARD_SIZE_MAX,
-    GENERATION_MODE_CHOICES,
+    GENERATION_MODE_LABELS,
     SPECIAL_SYMBOLS,
     check_pathability,
     compute_route_quality,
@@ -75,6 +75,8 @@ THEME = {
 }
 MAX_UNDO_STEPS = 30
 DEBOUNCE_MS = 180
+# Desktop UI stores the long label text; map back to core mode ids.
+_GENERATION_UI_LABEL_TO_MODE: dict[str, str] = {v: k for k, v in GENERATION_MODE_LABELS.items()}
 ZOOM_DEBOUNCE_MS = 60
 ZOOM_THROTTLE_MS = 16  # ~60 fps max redraw rate during scroll
 TILE_SIZE_MIN = 8
@@ -327,6 +329,7 @@ class BoardGeneratorApp:
         self._select_start: tuple[int, int] | None = None
         self.tile_size = 20
         self.app_mode_var = tk.StringVar(value="edit")
+        self.generation_mode_var = tk.StringVar(value=GENERATION_MODE_LABELS["grid"])
         self.mode_var = tk.StringVar(value="editor")
         self.paint_tile_var = tk.StringVar(value=".")
         self.board_origin_x = 0
@@ -684,6 +687,28 @@ class BoardGeneratorApp:
         # View-only: "Edit" button
         self.view_top_bar = self._frame(top)
         self._btn(self.view_top_bar, "Edit", lambda: self.app_mode_var.set("edit") or self._update_app_mode_ui()).pack(side="left", padx=2)
+        if self._ctk:
+            ctk.CTkLabel(self.view_top_bar, text="Generator:", text_color=THEME["fg_secondary"], font=ctk.CTkFont(size=fs)).pack(
+                side="left", padx=(sm, 4)
+            )
+            self._view_gen_menu = ctk.CTkOptionMenu(
+                self.view_top_bar,
+                variable=self.generation_mode_var,
+                values=list(GENERATION_MODE_LABELS.values()),
+                fg_color=THEME["border"],
+                button_color=THEME["accent"],
+                width=220,
+            )
+            self._view_gen_menu.pack(side="left", padx=2)
+        else:
+            tk.Label(self.view_top_bar, text="Generator:", bg=THEME["bg_dark"], fg=THEME["fg_secondary"], font=("Segoe UI", fs)).pack(
+                side="left", padx=(sm, 4)
+            )
+            self._view_gen_menu = tk.OptionMenu(
+                self.view_top_bar, self.generation_mode_var, *list(GENERATION_MODE_LABELS.values())
+            )
+            self._view_gen_menu.pack(side="left", padx=2)
+        Tooltip(self._view_gen_menu, "Grid = full terrain board. Pathway = intertwined routes (one start, one goal).")
 
         # Group 5: Zoom (always visible)
         self.size_var = tk.IntVar(value=self.tile_size)
@@ -881,7 +906,6 @@ class BoardGeneratorApp:
         self.seed_var = tk.StringVar(value="")
         self.weights_var = tk.StringVar(value=default_weights_string())
         self.symmetry_var = tk.StringVar(value="none")
-        self.generation_mode_var = tk.StringVar(value="grid")
         self.smoothing_var = tk.StringVar(value="1")
         self.cluster_var = tk.StringVar(value="0.2")
         self.tileset_var = tk.StringVar(value="Classic")
@@ -908,8 +932,15 @@ class BoardGeneratorApp:
                 tk.Label(r, text=label, bg=THEME["bg_panel"], fg=THEME["fg_primary"], font=("Segoe UI", THEME["font_body"]), width=10).pack(side="left", padx=(0, THEME["spacing_sm"]), pady=4)
                 make_widget(r).pack(side="left", pady=4)
 
-        # Section 1: Size
+        # Section 1: Size (always expanded — board generator lives here so it stays visible)
         _, content_size = self._collapsible_section(parent, "Size", True, accordion_state)
+        row(
+            content_size,
+            "Generator",
+            lambda r: self._make_option_menu(
+                r, self.generation_mode_var, list(GENERATION_MODE_LABELS.values()), 200
+            ),
+        )
         size_f = self._frame(content_size)
         size_f.pack(fill="x", padx=pad, pady=(pad, py))
         # 2×2 grid so all four presets fit in the narrow sidebar
@@ -932,7 +963,6 @@ class BoardGeneratorApp:
         # Section 2: Generation
         _, content_gen = self._collapsible_section(parent, "Generation", False, accordion_state)
         row(content_gen, "Seed", lambda r: self._make_entry(r, self.seed_var, 100))
-        row(content_gen, "Mode", lambda r: self._make_option_menu(r, self.generation_mode_var, list(GENERATION_MODE_CHOICES), 120))
         row(content_gen, "Symmetry", lambda r: self._make_option_menu(r, self.symmetry_var, ["none", "horizontal", "vertical", "both"], 120))
         row(content_gen, "Tileset", lambda r: self._make_option_menu(r, self.tileset_var, list(TILESET_PRESETS.keys()), 140))
         self._btn(content_gen, "Apply tileset", self.apply_tileset).pack(anchor="w", padx=pad, pady=py)
@@ -1089,7 +1119,9 @@ class BoardGeneratorApp:
             symmetry=self.symmetry_var.get(),
             smoothing_passes=int(self.smoothing_var.get()) if self.smoothing_var.get().strip().isdigit() else 1,
             cluster_bias=float(self.cluster_var.get()) if self.cluster_var.get().strip() else 0.2,
-            generation_mode=self.generation_mode_var.get(),
+            generation_mode=_GENERATION_UI_LABEL_TO_MODE.get(
+                self.generation_mode_var.get(), "grid"
+            ),
             num_starts=num_starts,
             goal_placement=self.goal_placement_var.get(),
             start_placement=self.start_placement_var.get(),
