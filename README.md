@@ -15,7 +15,7 @@ Running with no arguments opens the app. If **CustomTkinter** is installed, you 
 
 You can:
 - **Customise board size**: width and height (5–100) via spinboxes, plus one-click presets: **10×10**, **25×25**, **50×50**, **75×75**
-- switch generation mode between classic **grid** and **pathboard** (single start/end with intertwined route choices)
+- switch **board generator** in the desktop app (**Size** sidebar: **Generator** dropdown) or in the web UI (header or left **Board generator** panel): **Grid** (full terrain) vs **Pathway** (intertwined routes, one start and one goal)
 - set optional seed
 - tune terrain weights
 - apply symmetry, smoothing, and clustering

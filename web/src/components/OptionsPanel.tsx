@@ -27,9 +27,31 @@ export function OptionsPanel({
     if (weights) onOptionsChange({ ...options, terrain_weights: { ...weights } });
   };
 
+  const generationModeChoices = config?.generation_mode_choices ?? ["grid", "pathboard"];
+
   return (
     <div className="panel options-panel">
-      <div className="panel-title">Size</div>
+      <div className="panel-title">Board generator</div>
+      <div className="row">
+        <label htmlFor="generation-mode">Layout</label>
+        <select
+          id="generation-mode"
+          value={options.generation_mode}
+          onChange={(e) => onOptionsChange({ ...options, generation_mode: e.target.value })}
+          style={{ minWidth: 220, flex: 1 }}
+          title="Grid fills the board with terrain. Pathway builds a single network of intertwined routes between one start and one goal."
+        >
+          {generationModeChoices.map((m) => (
+            <option key={m} value={m}>
+              {m === "pathboard"
+                ? "Pathway — intertwined routes (1 start, 1 goal)"
+                : "Grid — full terrain board"}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="panel-title" style={{ marginTop: 12 }}>Size</div>
       <div className="row">
         <label>Width</label>
         <input
@@ -115,18 +137,6 @@ export function OptionsPanel({
         >
           {(config?.symmetry_choices ?? ["none", "horizontal", "vertical", "both"]).map((s) => (
             <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-      </div>
-      <div className="row">
-        <label>Mode</label>
-        <select
-          value={options.generation_mode}
-          onChange={(e) => onOptionsChange({ ...options, generation_mode: e.target.value })}
-          style={{ minWidth: 120 }}
-        >
-          {(config?.generation_mode_choices ?? ["grid", "pathboard"]).map((m) => (
-            <option key={m} value={m}>{m}</option>
           ))}
         </select>
       </div>
