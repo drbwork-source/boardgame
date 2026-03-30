@@ -64,6 +64,7 @@ class ConfigResponse(BaseModel):
     symmetry_choices: list[str] = ["none", "horizontal", "vertical", "both"]
     goal_placement_choices: list[str] = ["center", "random"]
     start_placement_choices: list[str] = ["corners", "random"]
+    generation_mode_choices: list[str] = ["grid", "pathboard"]
 
 
 class DeckCreateRequest(BaseModel):
@@ -107,6 +108,7 @@ class GenerateRequest(BaseModel):
     symmetry: str = "none"
     smoothing_passes: int = Field(ge=0, default=1)
     cluster_bias: float = Field(ge=0.0, le=1.0, default=0.2)
+    generation_mode: str = "grid"
     num_starts: int = Field(ge=1, le=4, default=4)
     goal_placement: str = "center"
     start_placement: str = "corners"
@@ -128,6 +130,7 @@ class GenerateBalancedRequest(BaseModel):
     symmetry: str = "none"
     smoothing_passes: int = Field(ge=0, default=1)
     cluster_bias: float = Field(ge=0.0, le=1.0, default=0.2)
+    generation_mode: str = "grid"
     num_starts: int = Field(ge=1, le=4, default=4)
     goal_placement: str = "center"
     start_placement: str = "corners"

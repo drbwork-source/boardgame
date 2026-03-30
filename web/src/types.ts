@@ -46,6 +46,7 @@ export interface Config {
   symmetry_choices: string[];
   goal_placement_choices: string[];
   start_placement_choices: string[];
+  generation_mode_choices: string[];
 }
 
 export type Board = string[][];
@@ -58,6 +59,7 @@ export interface GenerateOptions {
   symmetry: string;
   smoothing_passes: number;
   cluster_bias: number;
+  generation_mode: string;
   num_starts: number;
   goal_placement: string;
   start_placement: string;

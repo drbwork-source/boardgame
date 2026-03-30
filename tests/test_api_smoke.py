@@ -45,7 +45,7 @@ def test_get_config_smoke(client: TestClient):
 def test_board_generate_and_analysis_smoke(client: TestClient):
     gen = client.post(
         "/api/board/generate",
-        json={"width": 12, "height": 10, "seed": 1234, "num_starts": 2},
+        json={"width": 12, "height": 10, "seed": 1234, "num_starts": 2, "generation_mode": "pathboard"},
     )
     assert gen.status_code == 200
     board = gen.json()["board"]

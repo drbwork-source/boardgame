@@ -167,6 +167,7 @@ function buildGenerateOptionsBody(options: Partial<GenerateOptions>): Record<str
     symmetry: options.symmetry ?? "none",
     smoothing_passes: options.smoothing_passes ?? 1,
     cluster_bias: options.cluster_bias ?? 0.2,
+    generation_mode: options.generation_mode ?? "grid",
     num_starts: options.num_starts ?? 4,
     goal_placement: options.goal_placement ?? "center",
     start_placement: options.start_placement ?? "corners",

@@ -31,6 +31,7 @@ from board_core import (
     BOARD_PRESETS,
     BOARD_SIZE_MAX,
     BOARD_SIZE_MIN,
+    GENERATION_MODE_CHOICES,
     TILE_COLORS,
     TILE_METADATA,
     TILE_NAMES,
@@ -204,6 +205,7 @@ def get_config() -> ConfigResponse:
         symmetry_choices=["none", "horizontal", "vertical", "both"],
         goal_placement_choices=["center", "random"],
         start_placement_choices=["corners", "random"],
+        generation_mode_choices=list(GENERATION_MODE_CHOICES),
     )
 
 

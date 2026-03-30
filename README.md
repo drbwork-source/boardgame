@@ -15,6 +15,7 @@ Running with no arguments opens the app. If **CustomTkinter** is installed, you 
 
 You can:
 - **Customise board size**: width and height (5–100) via spinboxes, plus one-click presets: **10×10**, **25×25**, **50×50**, **75×75**
+- switch generation mode between classic **grid** and **pathboard** (single start/end with intertwined route choices)
 - set optional seed
 - tune terrain weights
 - apply symmetry, smoothing, and clustering
@@ -100,6 +101,7 @@ python board_generator.py --cli --seed 42 --symmetry horizontal --output board.t
 - `--tileset`: preset name (e.g. `Classic`, `Archipelago`, `Desert Frontier`, `Volcanic`); overrides `--weights` when set
 - `--weights`: terrain weights, e.g. `.:0.65,F:0.17,M:0.10,W:0.08` (ignored if `--tileset` is set)
 - `--symmetry`: `none`, `horizontal`, `vertical`, `both`
+- `--generation-mode`: `grid` or `pathboard`
 - `--smoothing`: neighborhood smoothing passes
 - `--cluster-bias`: value from `0.0` to `1.0`
 - `--output`: file path to save the board text

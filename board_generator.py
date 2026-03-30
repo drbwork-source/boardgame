@@ -17,6 +17,7 @@ from board_core import (
     BOARD_SIZE_MAX,
     BOARD_SIZE_MIN,
     BoardOptions,
+    GENERATION_MODE_CHOICES,
     TILE_COLORS,
     TILE_NAMES,
     TILE_RULES,
@@ -51,6 +52,7 @@ def run_cli(args: argparse.Namespace) -> None:
         symmetry=args.symmetry,
         smoothing_passes=args.smoothing,
         cluster_bias=args.cluster_bias,
+        generation_mode=args.generation_mode,
         num_starts=args.num_starts,
         goal_placement=args.goal_placement,
         start_placement=args.start_placement,
@@ -97,6 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--symmetry", choices=["none", "horizontal", "vertical", "both"], default="none")
     parser.add_argument("--smoothing", type=int, default=1)
     parser.add_argument("--cluster-bias", type=float, default=0.2)
+    parser.add_argument("--generation-mode", choices=list(GENERATION_MODE_CHOICES), default="grid")
     parser.add_argument("--num-starts", type=int, default=4, choices=[1, 2, 3, 4], help="number of start positions")
     parser.add_argument("--goal-placement", choices=["center", "random"], default="center")
     parser.add_argument("--start-placement", choices=["corners", "random"], default="corners")

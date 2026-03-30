@@ -27,6 +27,7 @@ START_SYMBOLS: list[CellType] = ["1", "2", "3", "4"]
 CHECKPOINT_SYMBOL: CellType = "C"
 SPECIAL_SYMBOLS: set[CellType] = {GOAL_SYMBOL} | set(START_SYMBOLS) | {CHECKPOINT_SYMBOL}
 BLOCKED_TILES: set[CellType] = {"W"}
+GENERATION_MODE_CHOICES: tuple[str, str] = ("grid", "pathboard")
 
 # ---------------------------------------------------------------------------
 # Unified tile definitions (single source of truth)
@@ -166,6 +167,7 @@ class BoardOptions:
     symmetry: str = "none"
     smoothing_passes: int = 1
     cluster_bias: float = 0.2
+    generation_mode: str = "grid"
     num_starts: int = 4
     goal_placement: str = "center"
     start_placement: str = "corners"
@@ -182,6 +184,8 @@ class BoardOptions:
             raise ValueError("smoothing_passes cannot be negative")
         if not (0.0 <= self.cluster_bias <= 1.0):
             raise ValueError("cluster_bias must be between 0.0 and 1.0")
+        if self.generation_mode not in set(GENERATION_MODE_CHOICES):
+            raise ValueError("generation_mode must be 'grid' or 'pathboard'")
         if not self.terrain_weights or sum(self.terrain_weights.values()) <= 0:
             raise ValueError("terrain_weights must sum to a positive number")
         if not (1 <= self.num_starts <= len(START_SYMBOLS)):
@@ -226,6 +230,150 @@ def _cells_in_radius(cx: int, cy: int, radius: int, width: int, height: int) -> 
             if _manhattan(x, y, cx, cy) <= radius:
                 out.append((x, y))
     return out
+
+
+def _cardinal_neighbors(x: int, y: int, width: int, height: int) -> list[tuple[int, int]]:
+    out: list[tuple[int, int]] = []
+    for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+        if 0 <= nx < width and 0 <= ny < height:
+            out.append((nx, ny))
+    return out
+
+
+def _choose_hybrid_path_weights(terrain_weights: dict[CellType, float]) -> dict[CellType, float]:
+    """
+    Build path tile weights for pathboard mode.
+    Uses user terrain bias where possible, but excludes blocked tiles and specials.
+    """
+    path_weights = {
+        symbol: weight
+        for symbol, weight in terrain_weights.items()
+        if symbol not in SPECIAL_SYMBOLS and symbol not in BLOCKED_TILES and weight > 0
+    }
+    if not path_weights:
+        return {".": 0.70, "F": 0.08, "M": 0.06, "B": 0.05, "D": 0.04, "O": 0.04, "A": 0.02, "V": 0.01}
+    if "." not in path_weights:
+        path_weights["."] = max(path_weights.values()) * 0.6
+    return path_weights
+
+
+def _carve_manhattan_route(
+    a: tuple[int, int],
+    b: tuple[int, int],
+    rng: random.Random,
+) -> list[tuple[int, int]]:
+    """Return a jittered Manhattan route from a to b."""
+    x, y = a
+    tx, ty = b
+    out = [(x, y)]
+    while (x, y) != (tx, ty):
+        step_options: list[tuple[int, int]] = []
+        if x < tx:
+            step_options.append((x + 1, y))
+        elif x > tx:
+            step_options.append((x - 1, y))
+        if y < ty:
+            step_options.append((x, y + 1))
+        elif y > ty:
+            step_options.append((x, y - 1))
+        if len(step_options) == 2 and rng.random() < 0.5:
+            step_options.reverse()
+        x, y = step_options[0]
+        out.append((x, y))
+    return out
+
+
+def _generate_pathboard_cells(
+    width: int,
+    height: int,
+    rng: random.Random,
+) -> tuple[set[tuple[int, int]], tuple[int, int], tuple[int, int]]:
+    """
+    Create an intertwined route graph with one start and one goal.
+    Returns (path_cells, start_xy, goal_xy).
+    """
+    start = (0, rng.randrange(height))
+    goal = (width - 1, rng.randrange(height))
+    path_cells: set[tuple[int, int]] = set()
+
+    # Main trunk path with mild noise but consistent pressure toward goal.
+    main_path = [start]
+    cur = start
+    safety = 0
+    while cur != goal and safety < width * height * 4:
+        safety += 1
+        cx, cy = cur
+        candidates = _cardinal_neighbors(cx, cy, width, height)
+        unseen = [p for p in candidates if p not in main_path]
+        if unseen:
+            candidates = unseen
+        best_score = None
+        best_next = candidates[0]
+        for nx, ny in candidates:
+            dist = _manhattan(nx, ny, goal[0], goal[1])
+            # Keep routes weaving around the center instead of hugging borders.
+            edge_penalty = 0.35 if nx in (0, width - 1) or ny in (0, height - 1) else 0.0
+            score = dist + edge_penalty + rng.random() * 1.2
+            if best_score is None or score < best_score:
+                best_score = score
+                best_next = (nx, ny)
+        if best_next in main_path and len(candidates) > 1:
+            for candidate in candidates:
+                if candidate not in main_path:
+                    best_next = candidate
+                    break
+        main_path.append(best_next)
+        cur = best_next
+    if main_path[-1] != goal:
+        for step in _carve_manhattan_route(main_path[-1], goal, rng)[1:]:
+            main_path.append(step)
+    path_cells.update(main_path)
+
+    # Branches that reconnect back, creating alternate intertwined choices.
+    branch_count = max(2, (width * height) // 140)
+    for _ in range(branch_count):
+        if len(main_path) < 6:
+            break
+        anchor_idx = rng.randrange(2, len(main_path) - 2)
+        anchor = main_path[anchor_idx]
+        branch_len = rng.randint(3, max(4, min(width, height) // 2))
+        branch: list[tuple[int, int]] = [anchor]
+        cur = anchor
+        for _step in range(branch_len):
+            cx, cy = cur
+            candidates = _cardinal_neighbors(cx, cy, width, height)
+            fresh = [p for p in candidates if p not in path_cells and p not in branch]
+            if not fresh:
+                fresh = [p for p in candidates if p not in branch] or candidates
+            cur = rng.choice(fresh)
+            branch.append(cur)
+            path_cells.add(cur)
+        # Reconnect branch to a distant point on the main path.
+        reconnect_candidates = [
+            cell
+            for cell in main_path
+            if _manhattan(cell[0], cell[1], cur[0], cur[1]) >= 3
+        ]
+        if reconnect_candidates:
+            reconnect_to = rng.choice(reconnect_candidates)
+            for step in _carve_manhattan_route(cur, reconnect_to, rng)[1:]:
+                path_cells.add(step)
+
+    return path_cells, start, goal
+
+
+def _generate_pathboard(options: BoardOptions, rng: random.Random) -> Board:
+    """Generate a pathboard with one start, one goal, and intertwined routes."""
+    board: Board = [["W" for _ in range(options.width)] for _ in range(options.height)]
+    path_cells, start_xy, goal_xy = _generate_pathboard_cells(options.width, options.height, rng)
+    path_weights = _choose_hybrid_path_weights(options.terrain_weights)
+    for x, y in path_cells:
+        board[y][x] = weighted_choice(rng, path_weights)
+    sx, sy = start_xy
+    gx, gy = goal_xy
+    board[sy][sx] = START_SYMBOLS[0]
+    board[gy][gx] = GOAL_SYMBOL
+    return board
 
 
 def apply_symmetry(board: Board, symmetry: str) -> None:
@@ -360,6 +508,9 @@ def generate_board(options: BoardOptions) -> Board:
     """
     options.validate()
     rng = random.Random(options.seed)
+    if options.generation_mode == "pathboard":
+        return _generate_pathboard(options, rng)
+
     terrain_weights = _terrain_only_weights(options.terrain_weights)
     if not terrain_weights:
         raise ValueError("terrain_weights must include at least one non-goal/start symbol")

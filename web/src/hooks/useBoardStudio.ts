@@ -27,6 +27,7 @@ const DEFAULT_OPTIONS: GenerateOptions = {
   symmetry: "none",
   smoothing_passes: 1,
   cluster_bias: 0.2,
+  generation_mode: "grid",
   num_starts: 4,
   goal_placement: "center",
   start_placement: "corners",

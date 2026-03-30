@@ -32,6 +32,7 @@ from board_core import (
     BOARD_PRESETS,
     BOARD_SIZE_MIN,
     BOARD_SIZE_MAX,
+    GENERATION_MODE_CHOICES,
     SPECIAL_SYMBOLS,
     check_pathability,
     compute_route_quality,
@@ -880,6 +881,7 @@ class BoardGeneratorApp:
         self.seed_var = tk.StringVar(value="")
         self.weights_var = tk.StringVar(value=default_weights_string())
         self.symmetry_var = tk.StringVar(value="none")
+        self.generation_mode_var = tk.StringVar(value="grid")
         self.smoothing_var = tk.StringVar(value="1")
         self.cluster_var = tk.StringVar(value="0.2")
         self.tileset_var = tk.StringVar(value="Classic")
@@ -930,6 +932,7 @@ class BoardGeneratorApp:
         # Section 2: Generation
         _, content_gen = self._collapsible_section(parent, "Generation", False, accordion_state)
         row(content_gen, "Seed", lambda r: self._make_entry(r, self.seed_var, 100))
+        row(content_gen, "Mode", lambda r: self._make_option_menu(r, self.generation_mode_var, list(GENERATION_MODE_CHOICES), 120))
         row(content_gen, "Symmetry", lambda r: self._make_option_menu(r, self.symmetry_var, ["none", "horizontal", "vertical", "both"], 120))
         row(content_gen, "Tileset", lambda r: self._make_option_menu(r, self.tileset_var, list(TILESET_PRESETS.keys()), 140))
         self._btn(content_gen, "Apply tileset", self.apply_tileset).pack(anchor="w", padx=pad, pady=py)
@@ -1086,6 +1089,7 @@ class BoardGeneratorApp:
             symmetry=self.symmetry_var.get(),
             smoothing_passes=int(self.smoothing_var.get()) if self.smoothing_var.get().strip().isdigit() else 1,
             cluster_bias=float(self.cluster_var.get()) if self.cluster_var.get().strip() else 0.2,
+            generation_mode=self.generation_mode_var.get(),
             num_starts=num_starts,
             goal_placement=self.goal_placement_var.get(),
             start_placement=self.start_placement_var.get(),

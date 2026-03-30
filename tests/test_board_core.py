@@ -56,6 +56,33 @@ def test_generate_board_invalid_options_raises():
         generate_board(BoardOptions(width=10, height=10, terrain_weights={}))
 
 
+def test_generate_pathboard_single_start_goal_and_reachable():
+    """Pathboard mode always uses one start/goal and keeps them connected."""
+    options = BoardOptions(width=28, height=18, seed=99, generation_mode="pathboard", num_starts=4)
+    board = generate_board(options)
+    goals = sum(1 for row in board for c in row if c == GOAL_SYMBOL)
+    starts = sum(1 for row in board for c in row if c in START_SYMBOLS)
+    assert goals == 1
+    assert starts == 1
+    ok, unreachable = check_pathability(board)
+    assert ok is True
+    assert unreachable == []
+
+
+def test_generate_pathboard_is_seed_deterministic():
+    """Pathboard generation should be deterministic for the same seed."""
+    options = BoardOptions(width=22, height=16, seed=12345, generation_mode="pathboard")
+    board1 = generate_board(options)
+    board2 = generate_board(options)
+    assert board1 == board2
+
+
+def test_generate_board_invalid_generation_mode_raises():
+    """Unknown generation mode should fail validation."""
+    with pytest.raises(ValueError):
+        generate_board(BoardOptions(width=10, height=10, generation_mode="unknown"))
+
+
 # ---------------------------------------------------------------------------
 # check_pathability
 # ---------------------------------------------------------------------------

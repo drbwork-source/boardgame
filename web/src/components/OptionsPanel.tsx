@@ -119,6 +119,18 @@ export function OptionsPanel({
         </select>
       </div>
       <div className="row">
+        <label>Mode</label>
+        <select
+          value={options.generation_mode}
+          onChange={(e) => onOptionsChange({ ...options, generation_mode: e.target.value })}
+          style={{ minWidth: 120 }}
+        >
+          {(config?.generation_mode_choices ?? ["grid", "pathboard"]).map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      </div>
+      <div className="row">
         <label>Smoothing</label>
         <input
           type="number"
