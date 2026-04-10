@@ -296,8 +296,8 @@ def _export_cards_image(path: str) -> None:
         x1, y1 = x0 + card_w, y0 + card_h
         draw.rectangle([x0, y0, x1, y1], fill="#F8FAFC", outline=THEME["border"], width=2)
         draw.text((x0 + card_w // 2 - 30, y0 + 20), f"Deck: {deck}", fill=THEME["bg_dark"], font=font)
-        draw.text((x0 + 10, y0 + 60), "Draw when landing on tiles", fill=THEME["fg_secondary"], font=font_small)
-        draw.text((x0 + 10, y0 + 80), "that use this deck.", fill=THEME["fg_secondary"], font=font_small)
+        draw.text((x0 + 10, y0 + 60), "Draw when finishing a move", fill=THEME["fg_secondary"], font=font_small)
+        draw.text((x0 + 10, y0 + 80), "on tiles that use this deck.", fill=THEME["fg_secondary"], font=font_small)
         for (cx, cy) in [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]:
             draw.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], outline="#000", width=1)
     img.save(path)
