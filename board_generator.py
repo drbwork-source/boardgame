@@ -1,7 +1,9 @@
-"""Interactive 50x50 board generator for desktop use.
+"""
+Board Generator Studio — entry point.
 
-- Default behavior (no args): launches a Tkinter app window.
-- Optional CLI behavior: use --cli to print one board in terminal.
+- Run with no arguments to open the desktop app (board-centred modern UI).
+- Use --cli for terminal mode instead of the app.
+- Import BoardOptions, generate_board, board_to_string, etc. for programmatic use.
 """
 
 from __future__ import annotations
@@ -477,417 +479,53 @@ class BoardGeneratorApp:
             font=("Helvetica", 9),
         ).grid(row=3, column=0, columnspan=10, padx=4, pady=(6, 2), sticky="w")
 
-        self._styled_button(controls, "Generate Board", self.generate).grid(
-            row=1, column=6, columnspan=2, sticky="ew", padx=4, pady=2
-        )
-        self._styled_button(controls, "Save Board...", self.save_board).grid(
-            row=2, column=6, columnspan=2, sticky="ew", padx=4, pady=2
-        )
-        self._styled_button(controls, "Export Image...", self.export_image).grid(
-            row=3, column=6, columnspan=2, sticky="ew", padx=4, pady=(2, 6)
-        )
-
-        legend = tk.LabelFrame(
-            main_content,
-            text="Tile Legend",
-            bg="#1C2541",
-            fg="#F8F9FA",
-            padx=8,
-            pady=8,
-            font=("Helvetica", 10, "bold"),
-        )
-        legend.pack(fill="x", padx=0, pady=(2, 6))
-        self.legend_frame = legend
-
-        board_frame = tk.LabelFrame(
-            main_content,
-            text="Board Preview",
-            bg="#1C2541",
-            fg="#F8F9FA",
-            padx=8,
-            pady=8,
-            font=("Helvetica", 10, "bold"),
-        )
-        board_frame.pack(fill="both", expand=True, padx=0, pady=(0, 0))
-
-        preview_header = tk.Frame(board_frame, bg="#1C2541")
-        preview_header.pack(fill="x", pady=(0, 6))
-        tk.Label(
-            preview_header,
-            text="Uniform square tiles with high-contrast borders for clear readability.",
-            bg="#1C2541",
-            fg="#C8D3F5",
-            font=("Helvetica", 9),
-        ).pack(side="left")
-
-        self.size_var = tk.IntVar(value=self.tile_size)
-        tk.Label(preview_header, text="Tile Size", bg="#1C2541", fg="#F8F9FA").pack(side="right", padx=(8, 4))
-        size_scale = tk.Scale(
-            preview_header,
-            variable=self.size_var,
-            from_=12,
-            to=32,
-            orient="horizontal",
-            command=self._on_tile_size_change,
-            bg="#1C2541",
-            fg="#F8F9FA",
-            highlightthickness=0,
-            troughcolor="#0F172A",
-            activebackground="#3A86FF",
-            length=140,
-        )
-        size_scale.pack(side="right")
-
-        canvas_shell = tk.Frame(board_frame, bg="#0F172A")
-        canvas_shell.pack(fill="both", expand=True)
-
-        self.board_canvas = tk.Canvas(
-            canvas_shell,
-            bg="#0B1020",
-            highlightthickness=0,
-            relief="flat",
-        )
-        x_scroll = ttk.Scrollbar(canvas_shell, orient="horizontal", command=self.board_canvas.xview)
-        y_scroll = ttk.Scrollbar(canvas_shell, orient="vertical", command=self.board_canvas.yview)
-        self.board_canvas.configure(xscrollcommand=x_scroll.set, yscrollcommand=y_scroll.set)
-
-        self.board_canvas.grid(row=0, column=0, sticky="nsew")
-        y_scroll.grid(row=0, column=1, sticky="ns")
-        x_scroll.grid(row=1, column=0, sticky="ew")
-        canvas_shell.grid_columnconfigure(0, weight=1)
-        canvas_shell.grid_rowconfigure(0, weight=1)
-
-        self.board_canvas.bind("<Button-1>", self._paint_tile)
-        self.board_canvas.bind("<B1-Motion>", self._paint_tile)
-        self.board_canvas.bind("<Configure>", self._on_canvas_resize)
-
-        self.refresh_legend()
-        self._update_mode_ui()
-        self.generate()
-
-    def _labeled_entry(self, parent: tk.Widget, label: str, var: tk.StringVar, col: int, width: int = 10) -> None:
-        tk.Label(parent, text=label, bg="#1C2541", fg="#F8F9FA").grid(row=0, column=col, padx=4, pady=2, sticky="w")
-        tk.Entry(parent, textvariable=var, width=width).grid(row=1, column=col, padx=4, pady=2, sticky="w")
-
-    def _styled_button(self, parent: tk.Widget, label: str, command) -> tk.Button:
-        return tk.Button(
-            parent,
-            text=label,
-            command=command,
-            bg="#3A86FF",
-            fg="white",
-            activebackground="#2667CC",
-            activeforeground="white",
-            relief="flat",
-            padx=8,
-            pady=5,
-            cursor="hand2",
-            font=("Helvetica", 10, "bold"),
-        )
-
-    def apply_tileset(self) -> None:
-        chosen = TILESET_PRESETS[self.tileset_var.get()]
-        self.weights_var.set(",".join(f"{symbol}:{weight:.2f}" for symbol, weight in chosen.items()))
-        self._refresh_editor_tile_options()
-        self.refresh_legend()
-
-    def add_custom_tile(self) -> None:
-        symbol = self.custom_tile_var.get().strip()
-        if len(symbol) != 1:
-            messagebox.showerror("Invalid tile", "Custom tile symbol must be exactly one character.")
-            return
-        try:
-            weight = float(self.custom_weight_var.get().strip())
-        except ValueError:
-            messagebox.showerror("Invalid weight", "Custom tile weight must be numeric.")
-            return
-        if weight < 0:
-            messagebox.showerror("Invalid weight", "Custom tile weight cannot be negative.")
-            return
-
-        weights = parse_weights(self.weights_var.get())
-        weights[symbol] = weight
-        self.weights_var.set(",".join(f"{tile}:{value:.2f}" for tile, value in weights.items()))
-        if symbol not in TILE_COLORS:
-            TILE_COLORS[symbol] = "#E2E8F0"
-            TILE_NAMES[symbol] = f"Tile '{symbol}'"
-            TILE_STYLES[symbol] = {"fg": "#111827", "bg": "#F8FAFC", "glyph": symbol}
-        self._refresh_editor_tile_options()
-        self.refresh_legend()
-
-    def _refresh_editor_tile_options(self) -> None:
-        menu = self.paint_tile_menu["menu"]
-        menu.delete(0, "end")
-        for symbol in sorted(TILE_COLORS.keys()):
-            menu.add_command(label=symbol, command=lambda value=symbol: self.paint_tile_var.set(value))
-        if self.paint_tile_var.get() not in TILE_COLORS:
-            self.paint_tile_var.set(sorted(TILE_COLORS.keys())[0])
-
-    def _update_mode_ui(self) -> None:
-        state = "normal" if self.mode_var.get() == "editor" else "disabled"
-        self.paint_tile_menu.configure(state=state)
-        if state == "disabled":
-            self.editor_hint_label.configure(text="Viewer mode selected. Switch to editor mode to paint tiles.")
-        else:
-            self.editor_hint_label.configure(text="Editor mode selected. Click or drag on the grid to paint tiles.")
-
-    def refresh_legend(self) -> None:
-        for child in self.legend_frame.winfo_children():
-            child.destroy()
-
-        tk.Label(
-            self.legend_frame,
-            text="Visual map key for terrain symbols",
-            bg="#1C2541",
-            fg="#C8D3F5",
-            font=("Helvetica", 9),
-        ).pack(anchor="w")
-
-        row = tk.Frame(self.legend_frame, bg="#1C2541")
-        row.pack(fill="x", pady=(6, 0))
-        for symbol, color in TILE_COLORS.items():
-            style = TILE_STYLES.get(symbol, {"fg": "#111827", "glyph": symbol})
-            chip = tk.Label(
-                row,
-                text=f" {style['glyph']} {symbol} {TILE_NAMES.get(symbol, 'Custom')} ",
-                bg=color,
-                fg=style["fg"],
-                padx=5,
-                pady=3,
-                font=("Helvetica", 9, "bold"),
-            )
-            chip.pack(side="left", padx=(0, 6), pady=2)
-
-    def _build_options(self) -> BoardOptions:
-        seed_text = self.seed_var.get().strip()
-        seed = int(seed_text) if seed_text else None
-        return BoardOptions(
-            width=int(self.width_var.get()),
-            height=int(self.height_var.get()),
-            seed=seed,
-            terrain_weights=parse_weights(self.weights_var.get()),
-            symmetry=self.symmetry_var.get(),
-            smoothing_passes=int(self.smoothing_var.get()),
-            cluster_bias=float(self.cluster_var.get()),
-        )
-
-    def generate(self) -> None:
-        try:
-            options = self._build_options()
-            board = generate_board(options)
-            self.current_board = board
-            self.board_text = board_to_string(board)
-            self._refresh_editor_tile_options()
-            self._draw_board(board)
-            self.refresh_legend()
-        except Exception as exc:
-            messagebox.showerror("Invalid options", str(exc))
-
-    def _on_tile_size_change(self, _value: str) -> None:
-        self.tile_size = self.size_var.get()
-        if self.current_board:
-            self._draw_board(self.current_board)
-
-    def _draw_board(self, board: Board) -> None:
-        self.board_canvas.delete("all")
-        if not board:
-            self.board_canvas.configure(scrollregion=(0, 0, 0, 0))
-            return
-
-        tile = self.tile_size
-        border_color = "#0F172A"
-
-        width = len(board[0]) * tile
-        height = len(board) * tile
-        canvas_w = max(1, self.board_canvas.winfo_width())
-        canvas_h = max(1, self.board_canvas.winfo_height())
-        self.board_origin_x = max(12, (canvas_w - width) // 2)
-        self.board_origin_y = max(12, (canvas_h - height) // 2)
-
-        for y, row in enumerate(board):
-            for x, symbol in enumerate(row):
-                style = TILE_STYLES.get(symbol, {"fg": "#111827", "bg": "#F8FAFC", "glyph": symbol})
-                color = TILE_COLORS.get(symbol, style["bg"])
-                x0 = self.board_origin_x + (x * tile)
-                y0 = self.board_origin_y + (y * tile)
-                x1 = x0 + tile
-                y1 = y0 + tile
-                self.board_canvas.create_rectangle(
-                    x0,
-                    y0,
-                    x1,
-                    y1,
-                    fill=color,
-                    outline=border_color,
-                    width=1,
-                )
-                self.board_canvas.create_text(
-                    x0 + tile / 2,
-                    y0 + tile / 2,
-                    text=style.get("glyph", symbol),
-                    fill=style["fg"],
-                    font=("Consolas", max(8, tile // 2), "bold"),
-                )
-
-        scroll_w = self.board_origin_x + width + 12
-        scroll_h = self.board_origin_y + height + 12
-        self.board_canvas.configure(scrollregion=(0, 0, scroll_w, scroll_h))
-
-    def _on_canvas_resize(self, _event: tk.Event) -> None:
-        if self.current_board:
-            self._draw_board(self.current_board)
-
-    def _paint_tile(self, event: tk.Event) -> None:
-        if self.mode_var.get() != "editor" or not self.current_board:
-            return
-
-        tile = self.tile_size
-        canvas_x = self.board_canvas.canvasx(event.x) - self.board_origin_x
-        canvas_y = self.board_canvas.canvasy(event.y) - self.board_origin_y
-        x = int(canvas_x // tile)
-        y = int(canvas_y // tile)
-        if not (0 <= y < len(self.current_board) and 0 <= x < len(self.current_board[0])):
-            return
-
-        selected = self.paint_tile_var.get()
-        if not selected:
-            return
-        self.current_board[y][x] = selected
-        self.board_text = board_to_string(self.current_board)
-        self._draw_board(self.current_board)
-
-    def save_board(self) -> None:
-        if not self.board_text.strip():
-            messagebox.showwarning("Nothing to save", "Generate a board first.")
-            return
-
-        path = filedialog.asksaveasfilename(
-            title="Save generated board",
-            defaultextension=".txt",
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
-            initialfile="generated_board.txt",
-        )
-        if not path:
-            return
-
-        Path(path).write_text(self.board_text, encoding="utf-8")
-        messagebox.showinfo("Saved", f"Board saved to:\n{path}")
-
-    def export_image(self) -> None:
-        if not self.current_board:
-            messagebox.showwarning("Nothing to export", "Generate a board first.")
-            return
-        pillow_available = Image is not None and ImageDraw is not None
-        filetypes = [("PNG image", "*.png")]
-        if pillow_available:
-            filetypes.append(("JPEG image", "*.jpg;*.jpeg"))
-        path = filedialog.asksaveasfilename(
-            title="Export board image",
-            defaultextension=".png",
-            filetypes=filetypes,
-            initialfile="generated_board.png",
-        )
-        if not path:
-            return
-
-        if pillow_available:
-            self._export_with_pillow(path)
-        else:
-            self._export_png_without_pillow(path)
-        messagebox.showinfo("Export complete", f"Board image exported to:\n{path}")
-
-    def _export_with_pillow(self, path: str) -> None:
-        tile = self.tile_size
-        width = len(self.current_board[0]) * tile
-        height = len(self.current_board) * tile
-        image = Image.new("RGB", (width, height), "#0B1020")
-        draw = ImageDraw.Draw(image)
-        font = ImageFont.load_default() if ImageFont is not None else None
-
-        for y, row in enumerate(self.current_board):
-            for x, symbol in enumerate(row):
-                style = TILE_STYLES.get(symbol, {"fg": "#111827", "glyph": symbol})
-                color = TILE_COLORS.get(symbol, "#F8FAFC")
-                x0, y0 = x * tile, y * tile
-                x1, y1 = x0 + tile, y0 + tile
-                draw.rectangle([x0, y0, x1, y1], fill=color, outline="#0F172A", width=1)
-
-                glyph = style.get("glyph", symbol)
-                if font is not None:
-                    bbox = draw.textbbox((0, 0), glyph, font=font)
-                    text_w = bbox[2] - bbox[0]
-                    text_h = bbox[3] - bbox[1]
-                    tx = x0 + (tile - text_w) / 2
-                    ty = y0 + (tile - text_h) / 2
-                    draw.text((tx, ty), glyph, fill=style["fg"], font=font)
-
-        image.save(path)
-
-    def _export_png_without_pillow(self, path: str) -> None:
-        tile = self.tile_size
-        width = len(self.current_board[0]) * tile
-        height = len(self.current_board) * tile
-        pixels = bytearray(width * height * 3)
-
-        for y, row in enumerate(self.current_board):
-            for x, symbol in enumerate(row):
-                color = TILE_COLORS.get(symbol, "#F8FAFC")
-                r, g, b = self._hex_to_rgb(color)
-                for py in range(y * tile, (y + 1) * tile):
-                    row_start = py * width * 3
-                    for px in range(x * tile, (x + 1) * tile):
-                        idx = row_start + px * 3
-                        pixels[idx : idx + 3] = bytes((r, g, b))
-
-        self._write_png(path, width, height, bytes(pixels))
-
-    def _hex_to_rgb(self, color: str) -> Tuple[int, int, int]:
-        value = color.lstrip("#")
-        if len(value) == 3:
-            value = "".join(ch * 2 for ch in value)
-        return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
-
-    def _write_png(self, path: str, width: int, height: int, rgb_data: bytes) -> None:
-        scanlines = bytearray()
-        stride = width * 3
-        for y in range(height):
-            scanlines.append(0)
-            start = y * stride
-            scanlines.extend(rgb_data[start : start + stride])
-
-        def chunk(chunk_type: bytes, data: bytes) -> bytes:
-            crc = binascii.crc32(chunk_type)
-            crc = binascii.crc32(data, crc) & 0xFFFFFFFF
-            return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
-
-        png = bytearray()
-        png.extend(b"\x89PNG\r\n\x1a\n")
-        ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
-        png.extend(chunk(b"IHDR", ihdr))
-        png.extend(chunk(b"IDAT", zlib.compress(bytes(scanlines), level=9)))
-        png.extend(chunk(b"IEND", b""))
-        Path(path).write_bytes(bytes(png))
-
-
-def run_gui() -> None:
-    root = tk.Tk()
-    BoardGeneratorApp(root)
-    root.mainloop()
+from board_core import (
+    BOARD_PRESETS,
+    BOARD_SIZE_MAX,
+    BOARD_SIZE_MIN,
+    BoardOptions,
+    GENERATION_MODE_CHOICES,
+    TILE_COLORS,
+    TILE_NAMES,
+    TILE_RULES,
+    TILESET_PRESETS,
+    board_to_display_string,
+    board_to_string,
+    check_pathability,
+    compute_route_quality,
+    default_weights_string,
+    generate_board,
+    parse_weights,
+)
 
 
 def run_cli(args: argparse.Namespace) -> None:
+    """Generate a board from CLI args, print it (and optionally save), then exit with 1 if pathability fails."""
+    if not (BOARD_SIZE_MIN <= args.width <= BOARD_SIZE_MAX):
+        print(f"Error: width must be between {BOARD_SIZE_MIN} and {BOARD_SIZE_MAX}.", file=sys.stderr)
+        sys.exit(1)
+    if not (BOARD_SIZE_MIN <= args.height <= BOARD_SIZE_MAX):
+        print(f"Error: height must be between {BOARD_SIZE_MIN} and {BOARD_SIZE_MAX}.", file=sys.stderr)
+        sys.exit(1)
+    if args.tileset is not None and args.tileset not in TILESET_PRESETS:
+        print(f"Error: unknown tileset '{args.tileset}'. Choose from: {', '.join(TILESET_PRESETS.keys())}.", file=sys.stderr)
+        sys.exit(1)
+    terrain_weights = TILESET_PRESETS[args.tileset] if args.tileset else args.weights
     options = BoardOptions(
         width=args.width,
         height=args.height,
         seed=args.seed,
-        terrain_weights=args.weights,
+        terrain_weights=terrain_weights,
         symmetry=args.symmetry,
         smoothing_passes=args.smoothing,
         cluster_bias=args.cluster_bias,
-        auto_place_start_end=args.auto_start_end,
-        start_end_min_distance=args.min_distance,
-        safe_segment_length=args.safe_segments,
-        checkpoint_interval=args.checkpoint_interval,
+        generation_mode=args.generation_mode,
+        num_starts=args.num_starts,
+        goal_placement=args.goal_placement,
+        start_placement=args.start_placement,
+        min_goal_distance=args.min_goal_distance,
+        safe_segment_radius=args.safe_segment_radius,
+        num_checkpoints=args.num_checkpoints,
     )
     board = generate_board(options)
     board_text = board_to_string(board)
@@ -899,34 +537,76 @@ def run_cli(args: argparse.Namespace) -> None:
     if args.output:
         Path(args.output).write_text(board_text, encoding="utf-8")
         print(f"\nSaved board to: {args.output}")
+    ok, unreachable = check_pathability(board)
+    if not ok:
+        if not args.quiet:
+            print(f"Warning: start(s) {[i+1 for i in unreachable]} cannot reach goal.", file=sys.stderr)
+        sys.exit(1)
+    if not args.quiet:
+        label, details = compute_route_quality(board)
+        print(f"Route quality: {label} — {details}", file=sys.stderr)
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build and return the argument parser for CLI mode."""
     parser = argparse.ArgumentParser(description="Generate randomized board-game grids")
-    parser.add_argument("--cli", action="store_true", help="run in terminal mode instead of interactive app")
-    parser.add_argument("--width", type=int, default=50)
-    parser.add_argument("--height", type=int, default=50)
+    parser.add_argument("--cli", action="store_true", help="run in terminal mode instead of the app")
+    parser.add_argument("--width", type=int, default=50, help=f"board width ({BOARD_SIZE_MIN}-{BOARD_SIZE_MAX})")
+    parser.add_argument("--height", type=int, default=50, help=f"board height ({BOARD_SIZE_MIN}-{BOARD_SIZE_MAX})")
     parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--weights", type=parse_weights, default=parse_weights(".:0.65,F:0.17,M:0.10,W:0.08"))
+    parser.add_argument(
+        "--weights",
+        type=parse_weights,
+        default=parse_weights(default_weights_string()),
+        help="terrain weights e.g. .:0.65,F:0.17 (ignored if --tileset is set)",
+    )
+    parser.add_argument(
+        "--tileset",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="use a preset tileset (e.g. Classic, Archipelago, Desert Frontier, Volcanic); overrides --weights",
+    )
     parser.add_argument("--symmetry", choices=["none", "horizontal", "vertical", "both"], default="none")
     parser.add_argument("--smoothing", type=int, default=1)
     parser.add_argument("--cluster-bias", type=float, default=0.2)
-    parser.add_argument("--auto-start-end", action="store_true", help="auto-place S/E tiles and progression checkpoints")
-    parser.add_argument("--min-distance", type=int, default=20, help="minimum Manhattan distance between auto-placed S and E")
-    parser.add_argument("--safe-segments", type=int, default=0, help="number of first/last route tiles converted to safe plains")
-    parser.add_argument("--checkpoint-interval", type=int, default=0, help="place C tiles every N steps along the main route")
+    parser.add_argument("--generation-mode", choices=list(GENERATION_MODE_CHOICES), default="grid")
+    parser.add_argument("--num-starts", type=int, default=4, choices=[1, 2, 3, 4], help="number of start positions")
+    parser.add_argument("--goal-placement", choices=["center", "random"], default="center")
+    parser.add_argument("--start-placement", choices=["corners", "random"], default="corners")
+    parser.add_argument("--min-goal-distance", type=int, default=0)
+    parser.add_argument("--safe-segment-radius", type=int, default=0)
+    parser.add_argument("--num-checkpoints", type=int, default=0)
     parser.add_argument("--output", type=str, default="")
+    parser.add_argument("--quiet", action="store_true", help="only print board; no route/pathability messages; exit 1 if unreachable")
+    parser.add_argument("--web", action="store_true", help="start the web API server (open http://localhost:5173 after running 'npm run dev' in web/)")
     return parser
+
+
+def run_web_server() -> None:
+    """Start the FastAPI backend for the web UI."""
+    try:
+        import uvicorn
+    except ImportError:
+        print("Install web dependencies: pip install fastapi 'uvicorn[standard]'", file=sys.stderr)
+        sys.exit(1)
+    print("Starting Board Generator Studio API at http://localhost:8000")
+    print("API docs: http://localhost:8000/docs")
+    print("Run the frontend with: cd web && npm install && npm run dev")
+    print("Then open http://localhost:5173")
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
 
 
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-
     if args.cli:
         run_cli(args)
+    elif args.web:
+        run_web_server()
     else:
-        run_gui()
+        from app import run_app
+        run_app()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,5 @@
+# Build-time dependencies for creating portable executables.
+# Install with: pip install -r requirements-build.txt
+# Then run: pyinstaller boardgame_desktop.spec  and/or  pyinstaller boardgame_web.spec
+
+pyinstaller>=6.0.0
