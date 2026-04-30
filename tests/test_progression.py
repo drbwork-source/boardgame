@@ -1,36 +1,46 @@
 import unittest
 
-from board_generator import BoardOptions, generate_board, validate_progression_path
+from board_core import BoardOptions, check_pathability, generate_board, validate_progression_path
 
 
 class ProgressionFeaturesTest(unittest.TestCase):
-    def test_auto_start_end_places_required_tiles(self) -> None:
+    def test_pathboard_places_goal_and_starts_and_is_reachable(self) -> None:
         board = generate_board(
-            BoardOptions(width=12, height=12, seed=7, auto_place_start_end=True)
+            BoardOptions(width=20, height=14, seed=7, generation_mode="pathboard", num_starts=2)
         )
-        flat = [cell for row in board for cell in row]
-        self.assertEqual(flat.count("S"), 1)
-        self.assertEqual(flat.count("E"), 1)
+        ok, _ = check_pathability(board)
+        self.assertTrue(ok)
 
-    def test_checkpoints_are_placed_when_interval_is_set(self) -> None:
+    def test_pathboard_with_checkpoints_reachable(self) -> None:
         board = generate_board(
             BoardOptions(
-                width=12,
-                height=12,
+                width=22,
+                height=16,
                 seed=11,
-                auto_place_start_end=True,
-                checkpoint_interval=4,
+                generation_mode="pathboard",
+                num_starts=2,
+                num_checkpoints=2,
             )
         )
-        checkpoint_count = sum(cell == "C" for row in board for cell in row)
-        self.assertGreaterEqual(checkpoint_count, 1)
+        ok, unreachable = check_pathability(board)
+        self.assertTrue(ok)
+        self.assertEqual(unreachable, [])
 
-    def test_validate_progression_path_accepts_generated_board(self) -> None:
-        board = generate_board(
-            BoardOptions(width=12, height=12, seed=13, auto_place_start_end=True)
-        )
+    def test_validate_progression_path_accepts_simple_route(self) -> None:
+        board = [
+            [".", ".", "."],
+            [".", ".", "."],
+            ["S", ".", "E"],
+        ]
+        valid, msg = validate_progression_path(board)
+        self.assertTrue(valid, msg)
+
+    def test_validate_progression_path_rejects_blocked_route(self) -> None:
+        board = [
+            ["S", "W", "E"],
+        ]
         valid, _ = validate_progression_path(board)
-        self.assertTrue(valid)
+        self.assertFalse(valid)
 
 
 if __name__ == "__main__":

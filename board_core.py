@@ -598,6 +598,40 @@ def _bfs_reachable(board: Board, start_xy: tuple[int, int], goal_xy: tuple[int, 
     return False
 
 
+def validate_progression_path(board: Board) -> tuple[bool, str]:
+    """
+    Legacy S/E validation: exactly one S and one E, cardinal-only path exists.
+    Used by CLI helpers and tests; main game logic uses numbered starts and G goal.
+    """
+    height = len(board)
+    width = len(board[0]) if height else 0
+    starts = [(x, y) for y in range(height) for x in range(width) if board[y][x] == "S"]
+    ends = [(x, y) for y in range(height) for x in range(width) if board[y][x] == "E"]
+
+    if len(starts) != 1 or len(ends) != 1:
+        return False, "Board must contain exactly one start tile (S) and one end tile (E)."
+
+    start = starts[0]
+    target = ends[0]
+    seen = {start}
+    queue: deque[tuple[tuple[int, int], int]] = deque([(start, 0)])
+
+    while queue:
+        (x, y), dist = queue.popleft()
+        if (x, y) == target:
+            return True, f"Valid path found: start-to-end route length is {dist} steps."
+
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if not (0 <= nx < width and 0 <= ny < height) or (nx, ny) in seen:
+                continue
+            if not _is_walkable(board[ny][nx]):
+                continue
+            seen.add((nx, ny))
+            queue.append(((nx, ny), dist + 1))
+
+    return False, "No valid route from start (S) to end (E)."
+
+
 def check_pathability(board: Board) -> tuple[bool, list[int]]:
     """
     Check whether all start positions can reach the goal.
